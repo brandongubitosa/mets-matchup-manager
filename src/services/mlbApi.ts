@@ -89,7 +89,9 @@ export const getMetsPitchers = async (): Promise<RosterPlayer[]> => {
   const result = await getMetsRoster();
   if (!result.success) return [];
 
-  return result.data.filter((player) => player.position.type === 'Pitcher');
+  return result.data.filter(
+    (player) => player.position.type === 'Pitcher' || player.position.abbreviation === 'TWP'
+  );
 };
 
 export const getPlayerDetails = async (playerId: number): Promise<ApiResult<Player>> => {
@@ -226,7 +228,9 @@ export const getTeamPitchers = async (teamId: number): Promise<RosterPlayer[]> =
   const result = await getTeamRoster(teamId);
   if (!result.success) return [];
 
-  return result.data.filter((player) => player.position.type === 'Pitcher');
+  return result.data.filter(
+    (player) => player.position.type === 'Pitcher' || player.position.abbreviation === 'TWP'
+  );
 };
 
 export const getTeamBatters = async (teamId: number): Promise<RosterPlayer[]> => {
