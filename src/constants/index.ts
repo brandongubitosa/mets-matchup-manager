@@ -1,17 +1,113 @@
+import { Platform, ViewStyle } from 'react-native';
+
 export const METS_TEAM_ID = 121;
 
 export const COLORS = {
-  primary: '#002D72', // Mets blue
-  secondary: '#D50032', // MLB red
-  background: '#F5F5F5',
+  // Core brand
+  primary: '#002D72',       // Mets blue
+  primaryLight: '#1A4A8A',  // Lighter blue for gradients
+  primaryDark: '#001A45',   // Darker blue for gradients
+  secondary: '#D50032',     // MLB red
+  secondaryLight: '#FF1A50',
+
+  // Surfaces
+  background: '#F0F2F5',
+  surfaceElevated: '#FFFFFF',
   white: '#FFFFFF',
-  black: '#000000',
-  gray: '#666666',
-  lightGray: '#E0E0E0',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  danger: '#F44336',
+  black: '#1A1A2E',
+
+  // Text
+  textPrimary: '#1A1A2E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+
+  // Neutral
+  gray: '#6B7280',
+  lightGray: '#E5E7EB',
+  borderLight: '#F3F4F6',
+
+  // Semantic
+  success: '#10B981',
+  successLight: '#D1FAE5',
+  warning: '#F59E0B',
+  warningLight: '#FEF3C7',
+  danger: '#EF4444',
+  dangerLight: '#FEE2E2',
+
+  // Overlay
+  overlay: 'rgba(0,0,0,0.5)',
+  glassBg: 'rgba(255,255,255,0.15)',
 };
+
+export const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+} as const;
+
+export const RADIUS = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
+} as const;
+
+export const FONT_SIZE = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  base: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  hero: 40,
+} as const;
+
+export const LINE_HEIGHT = {
+  xs: 14,
+  sm: 16,
+  md: 20,
+  base: 22,
+  lg: 24,
+  xl: 28,
+  xxl: 32,
+  xxxl: 40,
+} as const;
+
+type ShadowStyle = Pick<ViewStyle, 'shadowColor' | 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;
+
+export const SHADOW: Record<'sm' | 'md' | 'lg', ShadowStyle> = {
+  sm: {
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+};
+
+export const WEB_MAX_WIDTH = 480;
+
+export const isWeb = Platform.OS === 'web';
 
 export const MLB_TEAMS: { [key: number]: { name: string; abbreviation: string } } = {
   108: { name: 'Los Angeles Angels', abbreviation: 'LAA' },
