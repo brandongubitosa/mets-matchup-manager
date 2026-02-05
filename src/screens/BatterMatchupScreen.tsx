@@ -4,12 +4,13 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RouteProp } from '@react-navigation/native';
-import { COLORS, MLB_TEAMS } from '../constants';
-import { PlayerCard, TeamPicker, SearchBar } from '../components';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
+import { PlayerCard, TeamPicker, SearchBar, StepIndicator, SkeletonPlayerList, AnimatedCard } from '../components';
 import { RosterPlayer, RootStackParamList, BatterMatchupScreenNavigationProp } from '../types';
 import { getTeamBatters, getTeamPitchers } from '../services/mlbApi';
 
@@ -79,24 +80,34 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     pitcher.fullName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading {teamName} roster...</Text>
-      </View>
-    );
-  }
+  const currentStep = !selectedBatter ? 0 : !selectedTeamId ? 1 : 2;
+  const steps = [
+    { label: 'Batter' },
+    { label: 'Team' },
+    { label: 'Pitcher' },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{teamName} Batters vs. Pitchers</Text>
-      </View>
+      <LinearGradient
+        colors={[COLORS.primaryDark, COLORS.primary]}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>‹ Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{teamName} Batters</Text>
+        <Text style={styles.headerSubtitle}>vs. Opposing Pitchers</Text>
+      </LinearGradient>
 
-      {!selectedBatter ? (
+      <StepIndicator steps={steps} currentStep={currentStep} />
+
+      {loading ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonPlayerList count={5} />
+        </View>
+      ) : !selectedBatter ? (
         <>
-          <Text style={styles.stepTitle}>Step 1: Select a {teamName} Batter</Text>
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -105,11 +116,13 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
           <FlatList
             data={filteredBatters}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <PlayerCard
-                player={item}
-                onPress={() => handleSelectBatter(item)}
-              />
+            renderItem={({ item, index }) => (
+              <AnimatedCard delay={index * 40}>
+                <PlayerCard
+                  player={item}
+                  onPress={() => handleSelectBatter(item)}
+                />
+              </AnimatedCard>
             )}
             contentContainerStyle={styles.list}
           />
@@ -117,15 +130,13 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
       ) : !selectedTeamId ? (
         <>
           <View style={styles.selectedPlayer}>
-            <Text style={styles.selectedLabel}>Selected Batter:</Text>
             <PlayerCard
               player={selectedBatter}
               selected
               onPress={() => setSelectedBatter(null)}
             />
-            <Text style={styles.tapToChange}>Tap to change</Text>
+            <Text style={styles.tapToChange}>Tap player to change</Text>
           </View>
-          <Text style={styles.stepTitle}>Step 2: Select Opposing Team</Text>
           <TeamPicker
             selectedTeamId={selectedTeamId}
             onSelectTeam={handleSelectTeam}
@@ -134,31 +145,29 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
         </>
       ) : (
         <>
-          <View style={styles.selectedPlayer}>
-            <Text style={styles.selectedLabel}>
-              {selectedBatter.fullName} vs. {MLB_TEAMS[selectedTeamId]?.abbreviation} Pitchers
+          <View style={styles.matchupBanner}>
+            <Text style={styles.matchupText}>
+              {selectedBatter.fullName} vs. {MLB_TEAMS[selectedTeamId]?.abbreviation}
             </Text>
             <View style={styles.changeButtons}>
-              <Text
-                style={styles.changeLink}
-                onPress={() => setSelectedBatter(null)}
+              <TouchableOpacity
+                style={styles.changePill}
+                onPress={() => { setSelectedBatter(null); setSelectedTeamId(null); }}
               >
-                Change Batter
-              </Text>
-              <Text style={styles.separator}>|</Text>
-              <Text
-                style={styles.changeLink}
+                <Text style={styles.changePillText}>Change Batter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.changePill}
                 onPress={() => setSelectedTeamId(null)}
               >
-                Change Team
-              </Text>
+                <Text style={styles.changePillText}>Change Team</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
           {loadingPitchers ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Loading pitchers...</Text>
+            <View style={styles.skeletonContainer}>
+              <SkeletonPlayerList count={4} />
             </View>
           ) : (
             <>
@@ -170,11 +179,13 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
               <FlatList
                 data={filteredPitchers}
                 keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <PlayerCard
-                    player={item}
-                    onPress={() => handleSelectPitcher(item)}
-                  />
+                renderItem={({ item, index }) => (
+                  <AnimatedCard delay={index * 40}>
+                    <PlayerCard
+                      player={item}
+                      onPress={() => handleSelectPitcher(item)}
+                    />
+                  </AnimatedCard>
                 )}
                 contentContainerStyle={styles.list}
                 ListEmptyComponent={
@@ -195,77 +206,84 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    backgroundColor: COLORS.primary,
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
+  },
+  backBtn: {
+    marginBottom: SPACING.xs,
+  },
+  backBtnText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.base,
+    fontWeight: '600',
+    opacity: 0.9,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: '800',
     color: COLORS.white,
-    textAlign: 'center',
   },
-  stepTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.gray,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  headerSubtitle: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.white,
+    opacity: 0.7,
+    marginTop: 2,
   },
   list: {
-    paddingBottom: 20,
+    paddingBottom: SPACING.lg,
   },
-  loadingContainer: {
+  skeletonContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.gray,
+    paddingTop: SPACING.sm,
   },
   selectedPlayer: {
     backgroundColor: COLORS.white,
-    paddingVertical: 12,
+    paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  selectedLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primary,
-    textAlign: 'center',
-    marginBottom: 8,
+    borderBottomColor: COLORS.borderLight,
   },
   tapToChange: {
-    fontSize: 12,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: SPACING.xs,
+  },
+  matchupBanner: {
+    backgroundColor: COLORS.white,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  matchupText: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textAlign: 'center',
   },
   changeButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
   },
-  changeLink: {
-    fontSize: 14,
-    color: COLORS.secondary,
+  changePill: {
+    backgroundColor: COLORS.borderLight,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.full,
+  },
+  changePillText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
     fontWeight: '600',
-  },
-  separator: {
-    marginHorizontal: 12,
-    color: COLORS.lightGray,
   },
   emptyText: {
     textAlign: 'center',
-    color: COLORS.gray,
+    color: COLORS.textMuted,
     marginTop: 40,
-    fontSize: 16,
+    fontSize: FONT_SIZE.base,
   },
 });

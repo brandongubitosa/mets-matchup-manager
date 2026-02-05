@@ -1,114 +1,241 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  ActivityIndicator,
+  TextInput,
+  Animated,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, MLB_TEAMS } from '../constants';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp } from '../types';
 import { usePersistedTeam } from '../hooks';
-import { TodaysGameCard, TeamLogo } from '../components';
+import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
 
 type HomeScreenProps = {
   navigation: HomeScreenNavigationProp;
 };
 
-const teamList = Object.entries(MLB_TEAMS).map(([id, team]) => ({
-  id: parseInt(id),
-  ...team,
-})).sort((a, b) => a.name.localeCompare(b.name));
+const teamList = Object.entries(MLB_TEAMS)
+  .map(([id, team]) => ({
+    id: parseInt(id),
+    ...team,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
   const [showPicker, setShowPicker] = useState(false);
+  const [teamSearch, setTeamSearch] = useState('');
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(logoScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 12,
+        bounciness: 8,
+      }),
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoScale, logoOpacity]);
+
+  const filteredTeams = teamSearch
+    ? teamList.filter(
+        (t) =>
+          t.name.toLowerCase().includes(teamSearch.toLowerCase()) ||
+          t.abbreviation.toLowerCase().includes(teamSearch.toLowerCase())
+      )
+    : teamList;
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <LinearGradient
+          colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
+          style={styles.loadingContainer}
+        >
           <ActivityIndicator size="large" color={COLORS.white} />
-        </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header} accessibilityRole="header">
-        <TeamLogo teamId={selectedTeam.id} size={70} />
-        <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.teamSelector}>
+      <LinearGradient
+        colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
+        style={styles.header}
+      >
+        <Animated.View
+          style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}
+        >
+          <TeamLogo teamId={selectedTeam.id} size={80} />
+        </Animated.View>
+
+        <TouchableOpacity
+          onPress={() => setShowPicker(true)}
+          style={styles.teamSelector}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Change team"
+        >
           <Text style={styles.title}>{selectedTeam.abbreviation} Matchup</Text>
-          <Text style={styles.dropdownArrow}>▼</Text>
+          <View style={styles.dropdownBadge}>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.subtitle}>Manager</Text>
-      </View>
+      </LinearGradient>
 
+      {/* Team Picker Modal */}
       <Modal visible={showPicker} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Team</Text>
-            <FlatList
-              data={teamList}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.teamOption}
-                  onPress={() => { setSelectedTeam(item); setShowPicker(false); }}
-                >
-                  <Text style={styles.teamOptionText}>{item.name}</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Team</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPicker(false);
+                  setTeamSearch('');
+                }}
+                style={styles.modalCloseIcon}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSearchContainer}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search teams..."
+                placeholderTextColor={COLORS.textMuted}
+                value={teamSearch}
+                onChangeText={setTeamSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {teamSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setTeamSearch('')}>
+                  <Text style={styles.searchClear}>✕</Text>
                 </TouchableOpacity>
               )}
+            </View>
+
+            <FlatList
+              data={filteredTeams}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => {
+                const isSelected = item.id === selectedTeam.id;
+                return (
+                  <TouchableOpacity
+                    style={[styles.teamOption, isSelected && styles.teamOptionSelected]}
+                    onPress={() => {
+                      setSelectedTeam(item);
+                      setShowPicker(false);
+                      setTeamSearch('');
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <TeamLogo teamId={item.id} size={36} />
+                    <View style={styles.teamOptionInfo}>
+                      <Text
+                        style={[
+                          styles.teamOptionText,
+                          isSelected && styles.teamOptionTextSelected,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text style={styles.teamOptionAbbr}>{item.abbreviation}</Text>
+                    </View>
+                    {isSelected && <Text style={styles.checkIcon}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              }}
+              ItemSeparatorComponent={() => <View style={styles.teamOptionSeparator} />}
             />
-            <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
+      {/* Content Area */}
       <View style={styles.content}>
-        <TodaysGameCard
-          teamId={selectedTeam.id}
-          teamName={selectedTeam.name}
-          onViewMatchups={(opponentId, opponentName) => {
-            navigation.navigate('BatterMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name });
-          }}
-        />
+        <AnimatedCard delay={0}>
+          <TodaysGameCard
+            teamId={selectedTeam.id}
+            teamName={selectedTeam.name}
+            onViewMatchups={() => {
+              navigation.navigate('BatterMatchup', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+              });
+            }}
+          />
+        </AnimatedCard>
 
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('BatterMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name })}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${selectedTeam.name} batters matchups`}
+        <AnimatedCard
+          delay={100}
+          onPress={() =>
+            navigation.navigate('BatterMatchup', {
+              teamId: selectedTeam.id,
+              teamName: selectedTeam.name,
+            })
+          }
         >
-          <View style={styles.cardIcon}>
-            <Text style={styles.iconText}>💥</Text>
+          <View style={styles.card}>
+            <View style={[styles.cardIcon, { backgroundColor: COLORS.primary }]}>
+              <Text style={styles.iconText}>💥</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Batters</Text>
+              <Text style={styles.cardDescription}>
+                See how {selectedTeam.name} hitters perform against opposing pitchers
+              </Text>
+            </View>
+            <View style={styles.arrowContainer}>
+              <Text style={styles.arrow}>›</Text>
+            </View>
           </View>
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Batters</Text>
-            <Text style={styles.cardDescription}>
-              See how {selectedTeam.name} hitters perform against opposing pitchers
-            </Text>
-          </View>
-          <Text style={styles.arrow}>→</Text>
-        </TouchableOpacity>
+        </AnimatedCard>
 
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('PitcherMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name })}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${selectedTeam.name} pitchers matchups`}
+        <AnimatedCard
+          delay={200}
+          onPress={() =>
+            navigation.navigate('PitcherMatchup', {
+              teamId: selectedTeam.id,
+              teamName: selectedTeam.name,
+            })
+          }
         >
-          <View style={styles.cardIcon}>
-            <Text style={styles.iconText}>⚾</Text>
+          <View style={styles.card}>
+            <View style={[styles.cardIcon, { backgroundColor: COLORS.secondary }]}>
+              <Text style={styles.iconText}>⚾</Text>
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Pitchers</Text>
+              <Text style={styles.cardDescription}>
+                See how {selectedTeam.name} pitchers perform against opposing batters
+              </Text>
+            </View>
+            <View style={styles.arrowContainer}>
+              <Text style={styles.arrow}>›</Text>
+            </View>
           </View>
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Pitchers</Text>
-            <Text style={styles.cardDescription}>
-              See how {selectedTeam.name} pitchers perform against opposing batters
-            </Text>
-          </View>
-          <Text style={styles.arrow}>→</Text>
-        </TouchableOpacity>
+        </AnimatedCard>
       </View>
 
       <View style={styles.footer}>
@@ -125,132 +252,211 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: 40,
-    paddingBottom: 30,
-  },
-  logo: {
-    fontSize: 60,
-    marginBottom: 16,
+    paddingTop: 36,
+    paddingBottom: 32,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.xxxl,
+    fontWeight: '800',
     color: COLORS.white,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 24,
+    fontSize: FONT_SIZE.xl,
     color: COLORS.secondary,
-    fontWeight: '600',
+    fontWeight: '700',
+    marginTop: 2,
   },
   content: {
     flex: 1,
     backgroundColor: COLORS.background,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 30,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.md,
+    ...SHADOW.md,
   },
   cardIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: SPACING.md,
   },
   iconText: {
-    fontSize: 28,
+    fontSize: 26,
   },
   cardContent: {
     flex: 1,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 4,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
   },
   cardDescription: {
-    fontSize: 13,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
     lineHeight: 18,
   },
+  arrowContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   arrow: {
-    fontSize: 24,
-    color: COLORS.secondary,
-    fontWeight: 'bold',
+    fontSize: 22,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    marginTop: -2,
   },
   footer: {
     backgroundColor: COLORS.background,
-    paddingVertical: 16,
+    paddingVertical: SPACING.md,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 12,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
   },
+
+  // Team selector
   teamSelector: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: SPACING.sm,
+  },
+  dropdownBadge: {
+    backgroundColor: COLORS.glassBg,
+    borderRadius: RADIUS.full,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: SPACING.sm,
   },
   dropdownArrow: {
-    color: COLORS.secondary,
-    fontSize: 16,
-    marginLeft: 8,
+    color: COLORS.white,
+    fontSize: 10,
   },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
+    backgroundColor: COLORS.overlay,
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderRadius: 16,
-    maxHeight: '70%',
-    padding: 16,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    maxHeight: '80%',
+    paddingBottom: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
-    color: COLORS.black,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalCloseIcon: {
+    position: 'absolute',
+    right: SPACING.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    marginHorizontal: SPACING.md,
+    marginVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: SPACING.sm,
+  },
+  modalSearchInput: {
+    flex: 1,
+    height: 42,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.textPrimary,
+  },
+  searchClear: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textMuted,
+    padding: SPACING.xs,
   },
   teamOption: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  teamOptionSelected: {
+    backgroundColor: COLORS.borderLight,
+  },
+  teamOptionInfo: {
+    flex: 1,
+    marginLeft: SPACING.sm,
   },
   teamOptionText: {
-    fontSize: 16,
-    color: COLORS.black,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.textPrimary,
+    fontWeight: '500',
   },
-  closeBtn: {
-    marginTop: 16,
-    padding: 14,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 8,
+  teamOptionTextSelected: {
+    fontWeight: '700',
+    color: COLORS.primary,
   },
-  closeBtnText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: COLORS.gray,
+  teamOptionAbbr: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 1,
   },
+  teamOptionSeparator: {
+    height: 1,
+    backgroundColor: COLORS.borderLight,
+    marginLeft: 60,
+  },
+  checkIcon: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
