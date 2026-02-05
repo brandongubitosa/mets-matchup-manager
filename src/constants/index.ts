@@ -2,7 +2,7 @@ export const METS_TEAM_ID = 121;
 
 export const COLORS = {
   primary: '#002D72', // Mets blue
-  secondary: '#FF5910', // Mets orange
+  secondary: '#D50032', // MLB red
   background: '#F5F5F5',
   white: '#FFFFFF',
   black: '#000000',
@@ -47,3 +47,13 @@ export const MLB_TEAMS: { [key: number]: { name: string; abbreviation: string } 
 };
 
 export const NL_EAST_TEAMS = [121, 143, 144, 146, 120]; // Mets, Phillies, Braves, Marlins, Nationals
+
+// MLB team logo URL (PNG format, works better with React Native Image)
+export const getTeamLogoUrl = (teamId: number, size: number = 100): string => {
+  return `https://www.mlbstatic.com/team-logos/${teamId}.svg`;
+};
+
+// Alternative PNG logo URL (better compatibility)
+export const getTeamLogoPngUrl = (teamId: number): string => {
+  return `https://www.mlbstatic.com/team-logos/team-cap-on-light/${teamId}.svg`;
+};

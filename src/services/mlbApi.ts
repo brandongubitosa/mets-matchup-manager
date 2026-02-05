@@ -1,65 +1,126 @@
-import axios from 'axios';
-import { Player, MatchupStats, MatchupResult, RosterPlayer } from '../types';
+import axios, { AxiosError } from 'axios';
+import {
+  Player,
+  MatchupStats,
+  MatchupResult,
+  RosterPlayer,
+  MLBRosterResponse,
+  MLBPlayerResponse,
+  MLBStatsResponse,
+  ApiResult,
+} from '../types';
 import { METS_TEAM_ID } from '../constants';
 
 const BASE_URL = 'https://statsapi.mlb.com/api/v1';
+const API_TIMEOUT_MS = 10000;
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: API_TIMEOUT_MS,
 });
 
-export const getMetsRoster = async (): Promise<RosterPlayer[]> => {
+// Helper to parse player name - handles complex names like "J.D. Martinez" or "Fernando Tatis Jr."
+const parsePlayerName = (fullName: string, firstName?: string, lastName?: string): { firstName: string; lastName: string } => {
+  // Use API-provided names if available
+  if (firstName && lastName) {
+    return { firstName, lastName };
+  }
+  // Fallback to parsing fullName
+  const parts = fullName.split(' ');
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' ') || '',
+  };
+};
+
+// Helper to format error messages
+const formatError = (error: unknown): string => {
+  if (error instanceof AxiosError) {
+    if (error.code === 'ECONNABORTED') {
+      return 'Request timed out. Please try again.';
+    }
+    if (error.response?.status === 404) {
+      return 'Data not found.';
+    }
+    return `Network error: ${error.message}`;
+  }
+  return 'An unexpected error occurred.';
+};
+
+export const getMetsRoster = async (): Promise<ApiResult<RosterPlayer[]>> => {
   try {
-    const response = await api.get(`/teams/${METS_TEAM_ID}/roster?rosterType=active`);
-    return response.data.roster.map((r: any) => ({
-      id: r.person.id,
-      fullName: r.person.fullName,
-      firstName: r.person.fullName.split(' ')[0],
-      lastName: r.person.fullName.split(' ').slice(1).join(' '),
-      jerseyNumber: r.jerseyNumber,
-      position: r.position,
-      status: r.status,
-    }));
+    const response = await api.get<MLBRosterResponse>(`/teams/${METS_TEAM_ID}/roster?rosterType=active`);
+    const roster = response.data?.roster ?? [];
+
+    return {
+      success: true,
+      data: roster.map((r) => {
+        const { firstName, lastName } = parsePlayerName(
+          r.person.fullName,
+          r.person.firstName,
+          r.person.lastName
+        );
+        return {
+          id: r.person.id,
+          fullName: r.person.fullName,
+          firstName,
+          lastName,
+          jerseyNumber: r.jerseyNumber,
+          position: r.position,
+          status: r.status,
+        };
+      }),
+    };
   } catch (error) {
-    console.error('Error fetching Mets roster:', error);
-    return [];
+    return { success: false, error: formatError(error) };
   }
 };
 
 export const getMetsBatters = async (): Promise<RosterPlayer[]> => {
-  const roster = await getMetsRoster();
-  return roster.filter(
+  const result = await getMetsRoster();
+  if (!result.success) return [];
+
+  return result.data.filter(
     (player) => player.position.type !== 'Pitcher' || player.position.abbreviation === 'TWP'
   );
 };
 
 export const getMetsPitchers = async (): Promise<RosterPlayer[]> => {
-  const roster = await getMetsRoster();
-  return roster.filter((player) => player.position.type === 'Pitcher');
+  const result = await getMetsRoster();
+  if (!result.success) return [];
+
+  return result.data.filter((player) => player.position.type === 'Pitcher');
 };
 
-export const getPlayerDetails = async (playerId: number): Promise<Player | null> => {
+export const getPlayerDetails = async (playerId: number): Promise<ApiResult<Player>> => {
   try {
-    const response = await api.get(`/people/${playerId}`);
-    const person = response.data.people[0];
+    const response = await api.get<MLBPlayerResponse>(`/people/${playerId}`);
+    const people = response.data?.people ?? [];
+
+    if (people.length === 0) {
+      return { success: false, error: 'Player not found' };
+    }
+
+    const person = people[0];
     return {
-      id: person.id,
-      fullName: person.fullName,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      primaryNumber: person.primaryNumber,
-      position: person.primaryPosition,
-      batSide: person.batSide,
-      pitchHand: person.pitchHand,
+      success: true,
+      data: {
+        id: person.id,
+        fullName: person.fullName,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        primaryNumber: person.primaryNumber,
+        position: person.primaryPosition,
+        batSide: person.batSide,
+        pitchHand: person.pitchHand,
+      },
     };
   } catch (error) {
-    console.error('Error fetching player details:', error);
-    return null;
+    return { success: false, error: formatError(error) };
   }
 };
 
-export const searchPlayers = async (query: string, teamId?: number): Promise<Player[]> => {
+export const searchPlayers = async (query: string, teamId?: number): Promise<ApiResult<Player[]>> => {
   try {
     let url = `/sports/1/players?search=${encodeURIComponent(query)}`;
     if (teamId) {
@@ -67,71 +128,139 @@ export const searchPlayers = async (query: string, teamId?: number): Promise<Pla
     }
 
     const response = await api.get(url);
-    const players = teamId ? response.data.roster : response.data.people;
+    const players = teamId ? response.data?.roster : response.data?.people;
 
-    if (!players) return [];
+    if (!players) {
+      return { success: true, data: [] };
+    }
+
+    interface RosterItem {
+      person: {
+        id: number;
+        fullName: string;
+        firstName?: string;
+        lastName?: string;
+      };
+      position: {
+        code: string;
+        name: string;
+        type: string;
+        abbreviation: string;
+      };
+    }
+
+    interface PlayerItem {
+      id: number;
+      fullName: string;
+      firstName?: string;
+      lastName?: string;
+      primaryPosition: {
+        code: string;
+        name: string;
+        type: string;
+        abbreviation: string;
+      };
+    }
 
     const filtered = teamId
-      ? players.filter((r: any) =>
+      ? (players as RosterItem[]).filter((r) =>
           r.person.fullName.toLowerCase().includes(query.toLowerCase())
         )
       : players;
 
-    return (teamId ? filtered : players).slice(0, 20).map((p: any) => {
-      const person = teamId ? p.person : p;
+    const result = (teamId ? filtered : players).slice(0, 20).map((p: RosterItem | PlayerItem) => {
+      const isRoster = 'person' in p;
+      const person = isRoster ? (p as RosterItem).person : (p as PlayerItem);
+      const position = isRoster ? (p as RosterItem).position : (p as PlayerItem).primaryPosition;
+      const { firstName, lastName } = parsePlayerName(
+        person.fullName,
+        person.firstName,
+        person.lastName
+      );
+
       return {
         id: person.id,
         fullName: person.fullName,
-        firstName: person.fullName.split(' ')[0],
-        lastName: person.fullName.split(' ').slice(1).join(' '),
-        position: teamId ? p.position : person.primaryPosition,
+        firstName,
+        lastName,
+        position,
       };
     });
+
+    return { success: true, data: result };
   } catch (error) {
-    console.error('Error searching players:', error);
-    return [];
+    return { success: false, error: formatError(error) };
   }
 };
 
-export const getTeamRoster = async (teamId: number): Promise<RosterPlayer[]> => {
+export const getTeamRoster = async (teamId: number): Promise<ApiResult<RosterPlayer[]>> => {
   try {
-    const response = await api.get(`/teams/${teamId}/roster?rosterType=active`);
-    return response.data.roster.map((r: any) => ({
-      id: r.person.id,
-      fullName: r.person.fullName,
-      firstName: r.person.fullName.split(' ')[0],
-      lastName: r.person.fullName.split(' ').slice(1).join(' '),
-      jerseyNumber: r.jerseyNumber,
-      position: r.position,
-      status: r.status,
-    }));
+    const response = await api.get<MLBRosterResponse>(`/teams/${teamId}/roster?rosterType=active`);
+    const roster = response.data?.roster ?? [];
+
+    return {
+      success: true,
+      data: roster.map((r) => {
+        const { firstName, lastName } = parsePlayerName(
+          r.person.fullName,
+          r.person.firstName,
+          r.person.lastName
+        );
+        return {
+          id: r.person.id,
+          fullName: r.person.fullName,
+          firstName,
+          lastName,
+          jerseyNumber: r.jerseyNumber,
+          position: r.position,
+          status: r.status,
+        };
+      }),
+    };
   } catch (error) {
-    console.error('Error fetching team roster:', error);
-    return [];
+    return { success: false, error: formatError(error) };
   }
 };
 
 export const getTeamPitchers = async (teamId: number): Promise<RosterPlayer[]> => {
-  const roster = await getTeamRoster(teamId);
-  return roster.filter((player) => player.position.type === 'Pitcher');
+  const result = await getTeamRoster(teamId);
+  if (!result.success) return [];
+
+  return result.data.filter((player) => player.position.type === 'Pitcher');
 };
 
 export const getTeamBatters = async (teamId: number): Promise<RosterPlayer[]> => {
-  const roster = await getTeamRoster(teamId);
-  return roster.filter((player) => player.position.type !== 'Pitcher');
+  const result = await getTeamRoster(teamId);
+  if (!result.success) return [];
+
+  return result.data.filter((player) => player.position.type !== 'Pitcher');
 };
 
-const calculateStats = (stats: any): MatchupStats => {
-  const atBats = stats.atBats || 0;
-  const hits = stats.hits || 0;
-  const walks = stats.baseOnBalls || 0;
-  const hitByPitch = stats.hitByPitch || 0;
-  const sacFlies = stats.sacFlies || 0;
-  const totalBases =
-    hits +
-    (stats.doubles || 0) +
-    (stats.triples || 0) * 2 +
-    (stats.homeRuns || 0) * 3;
+interface RawMatchupStats {
+  gamesPlayed?: number;
+  atBats?: number;
+  hits?: number;
+  doubles?: number;
+  triples?: number;
+  homeRuns?: number;
+  rbi?: number;
+  baseOnBalls?: number;
+  strikeOuts?: number;
+  hitByPitch?: number;
+  sacFlies?: number;
+}
+
+const calculateStats = (stats: RawMatchupStats): MatchupStats => {
+  const atBats = stats.atBats ?? 0;
+  const hits = stats.hits ?? 0;
+  const walks = stats.baseOnBalls ?? 0;
+  const hitByPitch = stats.hitByPitch ?? 0;
+  const sacFlies = stats.sacFlies ?? 0;
+  const doubles = stats.doubles ?? 0;
+  const triples = stats.triples ?? 0;
+  const homeRuns = stats.homeRuns ?? 0;
+
+  const totalBases = hits + doubles + (triples * 2) + (homeRuns * 3);
 
   const avg = atBats > 0 ? (hits / atBats).toFixed(3) : '.000';
   const obpDenom = atBats + walks + hitByPitch + sacFlies;
@@ -140,15 +269,15 @@ const calculateStats = (stats: any): MatchupStats => {
   const opsValue = parseFloat(obp) + parseFloat(slg);
 
   return {
-    gamesPlayed: stats.gamesPlayed || 0,
+    gamesPlayed: stats.gamesPlayed ?? 0,
     atBats,
     hits,
-    doubles: stats.doubles || 0,
-    triples: stats.triples || 0,
-    homeRuns: stats.homeRuns || 0,
-    rbi: stats.rbi || 0,
+    doubles,
+    triples,
+    homeRuns,
+    rbi: stats.rbi ?? 0,
     walks,
-    strikeouts: stats.strikeOuts || 0,
+    strikeouts: stats.strikeOuts ?? 0,
     avg: avg.replace('0.', '.'),
     obp: obp.replace('0.', '.'),
     slg: slg.replace('0.', '.'),
@@ -159,112 +288,152 @@ const calculateStats = (stats: any): MatchupStats => {
 export const getBatterVsPitcher = async (
   batterId: number,
   pitcherId: number
-): Promise<MatchupResult | null> => {
+): Promise<ApiResult<MatchupResult>> => {
   try {
     const [matchupResponse, batterResponse, pitcherResponse] = await Promise.all([
-      api.get(
+      api.get<MLBStatsResponse>(
         `/people/${batterId}/stats?stats=vsPlayer&opposingPlayerId=${pitcherId}&group=hitting`
       ),
-      api.get(`/people/${batterId}`),
-      api.get(`/people/${pitcherId}`),
+      api.get<MLBPlayerResponse>(`/people/${batterId}`),
+      api.get<MLBPlayerResponse>(`/people/${pitcherId}`),
     ]);
 
-    const batter = batterResponse.data.people[0];
-    const pitcher = pitcherResponse.data.people[0];
-    const matchupStats = matchupResponse.data.stats?.[0]?.splits?.[0]?.stat;
+    const batterData = batterResponse.data?.people?.[0];
+    const pitcherData = pitcherResponse.data?.people?.[0];
 
-    if (!matchupStats) {
-      return {
-        batter: {
-          id: batter.id,
-          fullName: batter.fullName,
-          firstName: batter.firstName,
-          lastName: batter.lastName,
-          position: batter.primaryPosition,
-          batSide: batter.batSide,
-        },
-        pitcher: {
-          id: pitcher.id,
-          fullName: pitcher.fullName,
-          firstName: pitcher.firstName,
-          lastName: pitcher.lastName,
-          position: pitcher.primaryPosition,
-          pitchHand: pitcher.pitchHand,
-        },
-        stats: {
-          gamesPlayed: 0,
-          atBats: 0,
-          hits: 0,
-          doubles: 0,
-          triples: 0,
-          homeRuns: 0,
-          rbi: 0,
-          walks: 0,
-          strikeouts: 0,
-          avg: '.000',
-          obp: '.000',
-          slg: '.000',
-          ops: '.000',
-        },
-      };
+    if (!batterData || !pitcherData) {
+      return { success: false, error: 'Could not find player information' };
     }
 
+    const matchupStats = matchupResponse.data?.stats?.[0]?.splits?.[0]?.stat;
+
+    const emptyStats: MatchupStats = {
+      gamesPlayed: 0,
+      atBats: 0,
+      hits: 0,
+      doubles: 0,
+      triples: 0,
+      homeRuns: 0,
+      rbi: 0,
+      walks: 0,
+      strikeouts: 0,
+      avg: '.000',
+      obp: '.000',
+      slg: '.000',
+      ops: '.000',
+    };
+
     return {
-      batter: {
-        id: batter.id,
-        fullName: batter.fullName,
-        firstName: batter.firstName,
-        lastName: batter.lastName,
-        position: batter.primaryPosition,
-        batSide: batter.batSide,
+      success: true,
+      data: {
+        batter: {
+          id: batterData.id,
+          fullName: batterData.fullName,
+          firstName: batterData.firstName,
+          lastName: batterData.lastName,
+          position: batterData.primaryPosition,
+          batSide: batterData.batSide,
+        },
+        pitcher: {
+          id: pitcherData.id,
+          fullName: pitcherData.fullName,
+          firstName: pitcherData.firstName,
+          lastName: pitcherData.lastName,
+          position: pitcherData.primaryPosition,
+          pitchHand: pitcherData.pitchHand,
+        },
+        stats: matchupStats ? calculateStats(matchupStats) : emptyStats,
       },
-      pitcher: {
-        id: pitcher.id,
-        fullName: pitcher.fullName,
-        firstName: pitcher.firstName,
-        lastName: pitcher.lastName,
-        position: pitcher.primaryPosition,
-        pitchHand: pitcher.pitchHand,
-      },
-      stats: calculateStats(matchupStats),
     };
   } catch (error) {
-    console.error('Error fetching batter vs pitcher stats:', error);
-    return null;
+    return { success: false, error: formatError(error) };
   }
 };
 
-export const getTodaysGame = async (): Promise<any | null> => {
+// Get today's game for the default team (Mets)
+export const getTodaysGame = async (): Promise<ApiResult<{
+  gameId: number;
+  homeTeam: { id: number; name: string };
+  awayTeam: { id: number; name: string };
+  gameTime: string;
+}>> => {
+  return getTodaysGameForTeam(METS_TEAM_ID);
+};
+
+// Get today's game for any team
+export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
+  gameId: number;
+  homeTeam: { id: number; name: string };
+  awayTeam: { id: number; name: string };
+  gameTime: string;
+  isHome: boolean;
+  opponent: { id: number; name: string };
+}>> => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const response = await api.get(
-      `/schedule?sportId=1&teamId=${METS_TEAM_ID}&date=${today}`
+      `/schedule?sportId=1&teamId=${teamId}&date=${today}`
     );
 
-    const games = response.data.dates?.[0]?.games;
-    if (!games || games.length === 0) return null;
+    const games = response.data?.dates?.[0]?.games;
+    if (!games || games.length === 0) {
+      return { success: false, error: 'No game scheduled today' };
+    }
 
-    return games[0];
+    const game = games[0];
+    const isHome = game.teams.home.team.id === teamId;
+    const opponent = isHome ? game.teams.away.team : game.teams.home.team;
+
+    return {
+      success: true,
+      data: {
+        gameId: game.gamePk,
+        homeTeam: {
+          id: game.teams.home.team.id,
+          name: game.teams.home.team.name,
+        },
+        awayTeam: {
+          id: game.teams.away.team.id,
+          name: game.teams.away.team.name,
+        },
+        gameTime: game.gameDate,
+        isHome,
+        opponent: {
+          id: opponent.id,
+          name: opponent.name,
+        },
+      },
+    };
   } catch (error) {
-    console.error('Error fetching today\'s game:', error);
-    return null;
+    return { success: false, error: formatError(error) };
   }
 };
 
-export const getOpposingPitcher = async (gameId: number): Promise<Player | null> => {
+// Get opposing starting pitcher for a game
+export const getOpposingPitcherForTeam = async (gameId: number, teamId: number): Promise<ApiResult<Player>> => {
   try {
     const response = await api.get(`/game/${gameId}/boxscore`);
-    const teams = response.data.teams;
+    const teams = response.data?.teams;
 
-    const isHome = teams.home.team.id === METS_TEAM_ID;
+    if (!teams) {
+      return { success: false, error: 'Could not load game data' };
+    }
+
+    const isHome = teams.home?.team?.id === teamId;
     const opposingTeam = isHome ? teams.away : teams.home;
 
-    const startingPitcherId = opposingTeam.pitchers?.[0];
-    if (!startingPitcherId) return null;
+    const startingPitcherId = opposingTeam?.pitchers?.[0];
+    if (!startingPitcherId) {
+      return { success: false, error: 'Starting pitcher not available yet' };
+    }
 
     return getPlayerDetails(startingPitcherId);
   } catch (error) {
-    console.error('Error fetching opposing pitcher:', error);
-    return null;
+    return { success: false, error: formatError(error) };
   }
+};
+
+// Legacy: Get opposing starting pitcher for today's game (Mets)
+export const getOpposingPitcher = async (gameId: number): Promise<ApiResult<Player>> => {
+  return getOpposingPitcherForTeam(gameId, METS_TEAM_ID);
 };

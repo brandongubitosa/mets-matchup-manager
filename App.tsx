@@ -8,22 +8,18 @@ import {
   PitcherMatchupScreen,
   MatchupDetailScreen,
 } from './src/screens';
+import { ErrorBoundary } from './src/components';
 import { COLORS } from './src/constants';
-
-type RootStackParamList = {
-  Home: undefined;
-  BatterMatchup: undefined;
-  PitcherMatchup: undefined;
-  MatchupDetail: { batterId: number; pitcherId: number; mode: 'batter' | 'pitcher' };
-};
+import { RootStackParamList } from './src/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <StatusBar style="light" />
-      <Stack.Navigator
+    <ErrorBoundary>
+      <NavigationContainer>
+        <StatusBar style="light" />
+        <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{
           headerStyle: {
@@ -56,7 +52,8 @@ export default function App() {
           component={MatchupDetailScreen}
           options={{ title: 'Matchup Details' }}
         />
-      </Stack.Navigator>
-    </NavigationContainer>
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ErrorBoundary>
   );
 }

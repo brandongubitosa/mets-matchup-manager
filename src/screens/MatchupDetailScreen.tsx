@@ -5,25 +5,23 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants';
 import { StatsTable } from '../components';
-import { MatchupResult } from '../types';
+import { MatchupResult, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
 import { getBatterVsPitcher } from '../services/mlbApi';
 
-type RootStackParamList = {
-  Home: undefined;
-  BatterMatchup: undefined;
-  PitcherMatchup: undefined;
-  MatchupDetail: { batterId: number; pitcherId: number; mode: 'batter' | 'pitcher' };
+type MatchupDetailScreenProps = {
+  navigation: MatchupDetailScreenNavigationProp;
+  route: MatchupDetailScreenRouteProp;
 };
 
-type MatchupDetailScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'MatchupDetail'>;
-  route: RouteProp<RootStackParamList, 'MatchupDetail'>;
+// Safe division helper to prevent NaN/Infinity
+const safeDivide = (numerator: number, denominator: number, defaultValue: number = 0): number => {
+  if (denominator === 0) return defaultValue;
+  return numerator / denominator;
 };
 
 export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
@@ -36,24 +34,30 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMatchup();
-  }, [batterId, pitcherId]);
+    let cancelled = false;
 
-  const loadMatchup = async () => {
-    setLoading(true);
-    setError(null);
-    try {
+    const fetchMatchup = async () => {
+      setLoading(true);
+      setError(null);
+
       const result = await getBatterVsPitcher(batterId, pitcherId);
-      if (result) {
-        setMatchup(result);
+
+      if (cancelled) return;
+
+      if (result.success) {
+        setMatchup(result.data);
       } else {
-        setError('Could not load matchup data');
+        setError(result.error);
       }
-    } catch (err) {
-      setError('Error loading matchup data');
-    }
-    setLoading(false);
-  };
+      setLoading(false);
+    };
+
+    fetchMatchup();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batterId, pitcherId]);
 
   const getAdvantageText = () => {
     if (!matchup) return null;
@@ -81,7 +85,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.loadingContainer} accessibilityRole="progressbar" accessibilityLabel="Loading matchup data">
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading matchup data...</Text>
       </View>
@@ -90,7 +94,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
 
   if (error || !matchup) {
     return (
-      <View style={styles.errorContainer}>
+      <View style={styles.errorContainer} accessibilityRole="alert">
         <Text style={styles.errorIcon}>⚠️</Text>
         <Text style={styles.errorText}>{error || 'Something went wrong'}</Text>
       </View>
@@ -98,13 +102,21 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   }
 
   const advantage = getAdvantageText();
+  const { stats } = matchup;
+
+  // Calculate rates safely with guards against division by zero
+  const kRate = safeDivide(stats.strikeouts, stats.atBats) * 100;
+  const walkDenominator = stats.atBats + stats.walks;
+  const walkRate = safeDivide(stats.walks, walkDenominator) * 100;
+  const hrRate = safeDivide(stats.homeRuns, stats.atBats) * 100;
+  const singles = stats.hits - stats.doubles - stats.triples - stats.homeRuns;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <View style={styles.header}>
+        <View style={styles.header} accessibilityRole="header">
           <View style={styles.vsContainer}>
-            <View style={styles.playerBox}>
+            <View style={styles.playerBox} accessibilityLabel={`Batter: ${matchup.batter.fullName}`}>
               <Text style={styles.playerLabel}>BATTER</Text>
               <Text style={styles.playerName}>{matchup.batter.fullName}</Text>
               {matchup.batter.batSide && (
@@ -116,11 +128,11 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
               )}
             </View>
 
-            <View style={styles.vsCircle}>
+            <View style={styles.vsCircle} accessibilityLabel="versus">
               <Text style={styles.vsText}>VS</Text>
             </View>
 
-            <View style={styles.playerBox}>
+            <View style={styles.playerBox} accessibilityLabel={`Pitcher: ${matchup.pitcher.fullName}`}>
               <Text style={styles.playerLabel}>PITCHER</Text>
               <Text style={styles.playerName}>{matchup.pitcher.fullName}</Text>
               {matchup.pitcher.pitchHand && (
@@ -132,7 +144,11 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           </View>
 
           {advantage && (
-            <View style={[styles.advantageBadge, { backgroundColor: advantage.color }]}>
+            <View
+              style={[styles.advantageBadge, { backgroundColor: advantage.color }]}
+              accessibilityRole="text"
+              accessibilityLabel={`Matchup assessment: ${advantage.text}`}
+            >
               <Text style={styles.advantageText}>{advantage.text}</Text>
             </View>
           )}
@@ -140,46 +156,32 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
 
         <StatsTable stats={matchup.stats} title="Career Head-to-Head" />
 
-        {matchup.stats.atBats > 0 && (
-          <View style={styles.breakdown}>
+        {stats.atBats > 0 && (
+          <View style={styles.breakdown} accessibilityRole="region" accessibilityLabel="Quick analysis section">
             <Text style={styles.breakdownTitle}>Quick Analysis</Text>
             <View style={styles.analysisGrid}>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisValue}>
-                  {((matchup.stats.strikeouts / matchup.stats.atBats) * 100).toFixed(0)}%
-                </Text>
+              <View style={styles.analysisItem} accessibilityLabel={`Strikeout rate: ${kRate.toFixed(0)} percent`}>
+                <Text style={styles.analysisValue}>{kRate.toFixed(0)}%</Text>
                 <Text style={styles.analysisLabel}>K Rate</Text>
               </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisValue}>
-                  {(
-                    (matchup.stats.walks /
-                      (matchup.stats.atBats + matchup.stats.walks)) *
-                    100
-                  ).toFixed(0)}%
-                </Text>
+              <View style={styles.analysisItem} accessibilityLabel={`Walk rate: ${walkRate.toFixed(0)} percent`}>
+                <Text style={styles.analysisValue}>{walkRate.toFixed(0)}%</Text>
                 <Text style={styles.analysisLabel}>Walk Rate</Text>
               </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisValue}>
-                  {matchup.stats.atBats > 0
-                    ? (matchup.stats.homeRuns / matchup.stats.atBats * 100).toFixed(1)
-                    : '0'}%
-                </Text>
+              <View style={styles.analysisItem} accessibilityLabel={`Home run rate: ${hrRate.toFixed(1)} percent`}>
+                <Text style={styles.analysisValue}>{hrRate.toFixed(1)}%</Text>
                 <Text style={styles.analysisLabel}>HR Rate</Text>
               </View>
-              <View style={styles.analysisItem}>
-                <Text style={styles.analysisValue}>
-                  {(matchup.stats.hits - matchup.stats.doubles - matchup.stats.triples - matchup.stats.homeRuns)}
-                </Text>
+              <View style={styles.analysisItem} accessibilityLabel={`Singles: ${singles}`}>
+                <Text style={styles.analysisValue}>{singles}</Text>
                 <Text style={styles.analysisLabel}>Singles</Text>
               </View>
             </View>
           </View>
         )}
 
-        {matchup.stats.atBats === 0 && (
-          <View style={styles.noDataContainer}>
+        {stats.atBats === 0 && (
+          <View style={styles.noDataContainer} accessibilityRole="region" accessibilityLabel="No matchup history">
             <Text style={styles.noDataIcon}>📊</Text>
             <Text style={styles.noDataTitle}>No Previous Matchups</Text>
             <Text style={styles.noDataText}>
@@ -190,6 +192,15 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             </Text>
           </View>
         )}
+
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Select another matchup"
+        >
+          <Text style={styles.backButtonText}>← Select Another Matchup</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -345,5 +356,18 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  backButton: {
+    backgroundColor: COLORS.primary,
+    margin: 16,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

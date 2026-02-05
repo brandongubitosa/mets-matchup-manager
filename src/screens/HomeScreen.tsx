@@ -1,41 +1,91 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS } from '../constants';
-
-type RootStackParamList = {
-  Home: undefined;
-  BatterMatchup: undefined;
-  PitcherMatchup: undefined;
-  MatchupDetail: { batterId: number; pitcherId: number };
-};
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, MLB_TEAMS } from '../constants';
+import { HomeScreenNavigationProp } from '../types';
+import { usePersistedTeam } from '../hooks';
+import { TodaysGameCard, TeamLogo } from '../components';
 
 type HomeScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  navigation: HomeScreenNavigationProp;
 };
 
+const teamList = Object.entries(MLB_TEAMS).map(([id, team]) => ({
+  id: parseInt(id),
+  ...team,
+})).sort((a, b) => a.name.localeCompare(b.name));
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
+  const [showPicker, setShowPicker] = useState(false);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.white} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>⚾</Text>
-        <Text style={styles.title}>Mets Matchup</Text>
+      <View style={styles.header} accessibilityRole="header">
+        <TeamLogo teamId={selectedTeam.id} size={70} />
+        <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.teamSelector}>
+          <Text style={styles.title}>{selectedTeam.abbreviation} Matchup</Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
         <Text style={styles.subtitle}>Manager</Text>
       </View>
 
+      <Modal visible={showPicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Team</Text>
+            <FlatList
+              data={teamList}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.teamOption}
+                  onPress={() => { setSelectedTeam(item); setShowPicker(false); }}
+                >
+                  <Text style={styles.teamOptionText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.closeBtn}>
+              <Text style={styles.closeBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.content}>
+        <TodaysGameCard
+          teamId={selectedTeam.id}
+          teamName={selectedTeam.name}
+          onViewMatchups={(opponentId, opponentName) => {
+            navigation.navigate('BatterMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name });
+          }}
+        />
+
         <TouchableOpacity
           style={styles.card}
-          onPress={() => navigation.navigate('BatterMatchup')}
+          onPress={() => navigation.navigate('BatterMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name })}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${selectedTeam.name} batters matchups`}
         >
           <View style={styles.cardIcon}>
-            <Text style={styles.iconText}>🏏</Text>
+            <Text style={styles.iconText}>💥</Text>
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Mets Batters</Text>
+            <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Batters</Text>
             <Text style={styles.cardDescription}>
-              See how Mets hitters perform against opposing pitchers
+              See how {selectedTeam.name} hitters perform against opposing pitchers
             </Text>
           </View>
           <Text style={styles.arrow}>→</Text>
@@ -43,16 +93,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         <TouchableOpacity
           style={styles.card}
-          onPress={() => navigation.navigate('PitcherMatchup')}
+          onPress={() => navigation.navigate('PitcherMatchup', { teamId: selectedTeam.id, teamName: selectedTeam.name })}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${selectedTeam.name} pitchers matchups`}
         >
           <View style={styles.cardIcon}>
             <Text style={styles.iconText}>⚾</Text>
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Mets Pitchers</Text>
+            <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Pitchers</Text>
             <Text style={styles.cardDescription}>
-              See how Mets pitchers perform against opposing batters
+              See how {selectedTeam.name} pitchers perform against opposing batters
             </Text>
           </View>
           <Text style={styles.arrow}>→</Text>
@@ -150,5 +202,58 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     color: COLORS.gray,
+  },
+  teamSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dropdownArrow: {
+    color: COLORS.secondary,
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    maxHeight: '70%',
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+    color: COLORS.black,
+  },
+  teamOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  teamOptionText: {
+    fontSize: 16,
+    color: COLORS.black,
+  },
+  closeBtn: {
+    marginTop: 16,
+    padding: 14,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+  },
+  closeBtnText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: COLORS.gray,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

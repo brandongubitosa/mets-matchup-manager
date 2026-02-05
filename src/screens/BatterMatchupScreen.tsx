@@ -5,26 +5,21 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { RouteProp } from '@react-navigation/native';
 import { COLORS, MLB_TEAMS } from '../constants';
 import { PlayerCard, TeamPicker, SearchBar } from '../components';
-import { RosterPlayer } from '../types';
-import { getMetsBatters, getTeamPitchers } from '../services/mlbApi';
-
-type RootStackParamList = {
-  Home: undefined;
-  BatterMatchup: undefined;
-  PitcherMatchup: undefined;
-  MatchupDetail: { batterId: number; pitcherId: number; mode: 'batter' | 'pitcher' };
-};
+import { RosterPlayer, RootStackParamList, BatterMatchupScreenNavigationProp } from '../types';
+import { getTeamBatters, getTeamPitchers } from '../services/mlbApi';
 
 type BatterMatchupScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'BatterMatchup'>;
+  navigation: BatterMatchupScreenNavigationProp;
+  route: RouteProp<RootStackParamList, 'BatterMatchup'>;
 };
 
-export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ navigation }) => {
+export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ navigation, route }) => {
+  const { teamId, teamName } = route.params;
   const [metsBatters, setMetsBatters] = useState<RosterPlayer[]>([]);
   const [opposingPitchers, setOpposingPitchers] = useState<RosterPlayer[]>([]);
   const [selectedBatter, setSelectedBatter] = useState<RosterPlayer | null>(null);
@@ -34,8 +29,8 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   const [loadingPitchers, setLoadingPitchers] = useState(false);
 
   useEffect(() => {
-    loadMetsBatters();
-  }, []);
+    loadTeamBatters();
+  }, [teamId]);
 
   useEffect(() => {
     if (selectedTeamId) {
@@ -43,9 +38,9 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     }
   }, [selectedTeamId]);
 
-  const loadMetsBatters = async () => {
+  const loadTeamBatters = async () => {
     setLoading(true);
-    const batters = await getMetsBatters();
+    const batters = await getTeamBatters(teamId);
     setMetsBatters(batters);
     setLoading(false);
   };
@@ -88,7 +83,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading Mets roster...</Text>
+        <Text style={styles.loadingText}>Loading {teamName} roster...</Text>
       </View>
     );
   }
@@ -96,16 +91,16 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mets Batters vs. Pitchers</Text>
+        <Text style={styles.headerTitle}>{teamName} Batters vs. Pitchers</Text>
       </View>
 
       {!selectedBatter ? (
         <>
-          <Text style={styles.stepTitle}>Step 1: Select a Mets Batter</Text>
+          <Text style={styles.stepTitle}>Step 1: Select a {teamName} Batter</Text>
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search Mets batters..."
+            placeholder={`Search ${teamName} batters...`}
           />
           <FlatList
             data={filteredBatters}
@@ -134,6 +129,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
           <TeamPicker
             selectedTeamId={selectedTeamId}
             onSelectTeam={handleSelectTeam}
+            excludeTeamId={teamId}
           />
         </>
       ) : (
