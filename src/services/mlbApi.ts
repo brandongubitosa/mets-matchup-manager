@@ -294,12 +294,15 @@ export const getBatterVsPitcher = async (
   pitcherId: number
 ): Promise<ApiResult<MatchupResult>> => {
   try {
-    const [matchupResponse, batterResponse, pitcherResponse] = await Promise.all([
+    const [matchupResponse, batterResponse, pitcherResponse, seasonResponse] = await Promise.all([
       api.get<MLBStatsResponse>(
         `/people/${batterId}/stats?stats=vsPlayer&opposingPlayerId=${pitcherId}&group=hitting`
       ),
       api.get<MLBPlayerResponse>(`/people/${batterId}`),
       api.get<MLBPlayerResponse>(`/people/${pitcherId}`),
+      api.get<MLBStatsResponse>(
+        `/people/${batterId}/stats?stats=season&group=hitting`
+      ),
     ]);
 
     const batterData = batterResponse.data?.people?.[0];
@@ -310,6 +313,7 @@ export const getBatterVsPitcher = async (
     }
 
     const matchupStats = matchupResponse.data?.stats?.[0]?.splits?.[0]?.stat;
+    const seasonStats = seasonResponse.data?.stats?.[0]?.splits?.[0]?.stat;
 
     const emptyStats: MatchupStats = {
       gamesPlayed: 0,
@@ -347,6 +351,7 @@ export const getBatterVsPitcher = async (
           pitchHand: pitcherData.pitchHand,
         },
         stats: matchupStats ? calculateStats(matchupStats) : emptyStats,
+        seasonStats: seasonStats ? calculateStats(seasonStats) : undefined,
       },
     };
   } catch (error) {
@@ -364,7 +369,7 @@ export const getTodaysGame = async (): Promise<ApiResult<{
   return getTodaysGameForTeam(METS_TEAM_ID);
 };
 
-// Get today's game for any team
+// Get today's game for any team (with probable pitchers via hydrate)
 export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
   gameId: number;
   homeTeam: { id: number; name: string };
@@ -372,11 +377,12 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
   gameTime: string;
   isHome: boolean;
   opponent: { id: number; name: string };
+  probablePitcher?: { id: number; fullName: string };
 }>> => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const response = await api.get(
-      `/schedule?sportId=1&teamId=${teamId}&date=${today}`
+      `/schedule?sportId=1&teamId=${teamId}&date=${today}&hydrate=probablePitcher`
     );
 
     const games = response.data?.dates?.[0]?.games;
@@ -387,6 +393,10 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
     const game = games[0];
     const isHome = game.teams.home.team.id === teamId;
     const opponent = isHome ? game.teams.away.team : game.teams.home.team;
+
+    // Extract probable pitcher for the opposing team
+    const opposingTeamData = isHome ? game.teams.away : game.teams.home;
+    const probablePitcherData = opposingTeamData?.probablePitcher;
 
     return {
       success: true,
@@ -406,6 +416,9 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
           id: opponent.id,
           name: opponent.name,
         },
+        probablePitcher: probablePitcherData?.id
+          ? { id: probablePitcherData.id, fullName: probablePitcherData.fullName }
+          : undefined,
       },
     };
   } catch (error) {

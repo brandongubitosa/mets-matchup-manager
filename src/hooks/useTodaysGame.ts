@@ -32,12 +32,24 @@ export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
 
     setGame(gameResult.data);
 
-    // Try to get opposing pitcher
-    const pitcherResult = await getOpposingPitcherForTeam(gameResult.data.gameId, teamId);
-    if (pitcherResult.success) {
-      setOpposingPitcher(pitcherResult.data);
+    // Use probable pitcher from schedule hydrate if available, else fall back to boxscore
+    if (gameResult.data.probablePitcher) {
+      const pp = gameResult.data.probablePitcher;
+      setOpposingPitcher({
+        id: pp.id,
+        fullName: pp.fullName,
+        firstName: pp.fullName.split(' ')[0],
+        lastName: pp.fullName.split(' ').slice(1).join(' '),
+        position: { code: '1', name: 'Pitcher', type: 'Pitcher', abbreviation: 'P' },
+      } as Player);
     } else {
-      setOpposingPitcher(null);
+      // Fall back to boxscore method
+      const pitcherResult = await getOpposingPitcherForTeam(gameResult.data.gameId, teamId);
+      if (pitcherResult.success) {
+        setOpposingPitcher(pitcherResult.data);
+      } else {
+        setOpposingPitcher(null);
+      }
     }
 
     setLoading(false);

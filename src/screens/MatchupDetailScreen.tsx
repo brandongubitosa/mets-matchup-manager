@@ -60,6 +60,22 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
     };
   }, [batterId, pitcherId]);
 
+  const getPlatoonText = () => {
+    if (!matchup) return null;
+    const batCode = matchup.batter.batSide?.code;
+    const throwCode = matchup.pitcher.pitchHand?.code;
+    if (!batCode || !throwCode) return null;
+
+    if (batCode === 'S') {
+      return { text: 'Switch Hitter', color: COLORS.primary };
+    }
+    // Opposite hand = platoon advantage for batter
+    if (batCode !== throwCode) {
+      return { text: 'Platoon Advantage', color: COLORS.success };
+    }
+    return { text: 'Same-Side Matchup', color: COLORS.warning };
+  };
+
   const getAdvantageText = () => {
     if (!matchup) return null;
     const avg = parseFloat(matchup.stats.avg);
@@ -122,7 +138,9 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   }
 
   const advantage = getAdvantageText();
+  const platoon = getPlatoonText();
   const { stats } = matchup;
+  const seasonStats = matchup.seasonStats;
 
   const kRate = safeDivide(stats.strikeouts, stats.atBats) * 100;
   const walkDenominator = stats.atBats + stats.walks;
@@ -182,19 +200,62 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             </View>
           </View>
 
-          {advantage && (
-            <View style={[styles.advantageBadge, { backgroundColor: advantage.color }]}>
-              <Text style={styles.advantageText}>{advantage.text}</Text>
-            </View>
-          )}
+          <View style={styles.badgeRow}>
+            {platoon && (
+              <View style={[styles.platoonBadge, { backgroundColor: platoon.color }]}>
+                <Text style={styles.platoonBadgeText}>{platoon.text}</Text>
+              </View>
+            )}
+            {advantage && (
+              <View style={[styles.advantageBadge, { backgroundColor: advantage.color }]}>
+                <Text style={styles.advantageText}>{advantage.text}</Text>
+              </View>
+            )}
+          </View>
         </LinearGradient>
 
         <AnimatedCard delay={0}>
           <StatsTable stats={matchup.stats} title="Career Head-to-Head" />
         </AnimatedCard>
 
+        {seasonStats && (
+          <AnimatedCard delay={100}>
+            <View style={styles.seasonSection}>
+              <Text style={styles.seasonTitle}>
+                {matchup.batter.fullName} - Current Season
+              </Text>
+              <View style={styles.seasonGrid}>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.avg}</Text>
+                  <Text style={styles.seasonLabel}>AVG</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.homeRuns}</Text>
+                  <Text style={styles.seasonLabel}>HR</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.rbi}</Text>
+                  <Text style={styles.seasonLabel}>RBI</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.ops}</Text>
+                  <Text style={styles.seasonLabel}>OPS</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.hits}</Text>
+                  <Text style={styles.seasonLabel}>H</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={styles.seasonValue}>{seasonStats.gamesPlayed}</Text>
+                  <Text style={styles.seasonLabel}>GP</Text>
+                </View>
+              </View>
+            </View>
+          </AnimatedCard>
+        )}
+
         {stats.atBats > 0 && (
-          <AnimatedCard delay={150}>
+          <AnimatedCard delay={200}>
             <View style={styles.statBarsContainer}>
               <Text style={styles.statBarsTitle}>Performance Breakdown</Text>
               <StatBar
@@ -230,7 +291,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
         )}
 
         {stats.atBats > 0 && (
-          <AnimatedCard delay={300}>
+          <AnimatedCard delay={350}>
             <View style={styles.breakdown}>
               <Text style={styles.breakdownTitle}>Quick Analysis</Text>
               <View style={styles.analysisGrid}>
@@ -256,7 +317,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
         )}
 
         {stats.atBats === 0 && (
-          <AnimatedCard delay={150}>
+          <AnimatedCard delay={200}>
             <View style={styles.noDataContainer}>
               <Text style={styles.noDataIcon}>&#128202;</Text>
               <Text style={styles.noDataTitle}>No Previous Matchups</Text>
@@ -366,18 +427,79 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
   },
 
+  // Badge row
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    flexWrap: 'wrap',
+  },
+  platoonBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.full,
+  },
+  platoonBadgeText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
   // Advantage badge
   advantageBadge: {
-    alignSelf: 'center',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs + 2,
     borderRadius: RADIUS.full,
-    marginTop: SPACING.md,
   },
   advantageText: {
     color: COLORS.white,
     fontWeight: '700',
+    fontSize: FONT_SIZE.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // Season stats
+  seasonSection: {
+    backgroundColor: COLORS.white,
+    margin: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOW.md,
+  },
+  seasonTitle: {
     fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  seasonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  seasonStat: {
+    width: '30%',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  seasonValue: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  seasonLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // Stat bars

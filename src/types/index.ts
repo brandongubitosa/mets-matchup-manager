@@ -77,6 +77,10 @@ export interface TodaysGame {
     id: number;
     name: string;
   };
+  probablePitcher?: {
+    id: number;
+    fullName: string;
+  };
 }
 
 export interface RosterPlayer extends Player {
