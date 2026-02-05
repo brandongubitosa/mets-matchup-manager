@@ -77,6 +77,7 @@ export const LINE_HEIGHT = {
   xl: 28,
   xxl: 32,
   xxxl: 40,
+  hero: 48,
 } as const;
 
 type ShadowStyle = Pick<ViewStyle, 'shadowColor' | 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;

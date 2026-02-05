@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../constants';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
 import { MatchupStats } from '../types';
 
 interface StatsTableProps {
@@ -8,7 +8,45 @@ interface StatsTableProps {
   title?: string;
 }
 
+const getStatColor = (label: string, value: string | number): string | undefined => {
+  const numVal = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numVal)) return undefined;
+
+  switch (label) {
+    case 'AVG':
+      if (numVal >= 0.3) return COLORS.success;
+      if (numVal >= 0.25) return COLORS.warning;
+      if (numVal > 0 && numVal < 0.2) return COLORS.danger;
+      return undefined;
+    case 'OBP':
+      if (numVal >= 0.35) return COLORS.success;
+      if (numVal >= 0.3) return COLORS.warning;
+      return undefined;
+    case 'SLG':
+      if (numVal >= 0.45) return COLORS.success;
+      if (numVal >= 0.35) return COLORS.warning;
+      return undefined;
+    case 'OPS':
+      if (numVal >= 0.8) return COLORS.success;
+      if (numVal >= 0.7) return COLORS.warning;
+      return undefined;
+    default:
+      return undefined;
+  }
+};
+
 export const StatsTable: React.FC<StatsTableProps> = ({ stats, title }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      delay: 100,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
   const statRows = [
     { label: 'AB', value: stats.atBats },
     { label: 'H', value: stats.hits },
@@ -22,40 +60,38 @@ export const StatsTable: React.FC<StatsTableProps> = ({ stats, title }) => {
     { label: 'OPS', value: stats.ops },
   ];
 
-  const getAvgColor = (avg: string) => {
-    const value = parseFloat(avg);
-    if (value >= 0.3) return COLORS.success;
-    if (value >= 0.25) return COLORS.warning;
-    if (value < 0.2) return COLORS.danger;
-    return COLORS.black;
-  };
-
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       {title && <Text style={styles.title}>{title}</Text>}
       <View style={styles.table}>
         <View style={styles.row}>
-          {statRows.slice(0, 5).map((stat) => (
-            <View key={stat.label} style={styles.cell}>
-              <Text style={styles.label}>{stat.label}</Text>
-              <Text
-                style={[
-                  styles.value,
-                  stat.label === 'AVG' && { color: getAvgColor(stats.avg) },
-                ]}
-              >
-                {stat.value}
-              </Text>
-            </View>
-          ))}
+          {statRows.slice(0, 5).map((stat) => {
+            const color = getStatColor(stat.label, stat.value);
+            return (
+              <View key={stat.label} style={styles.cell}>
+                <Text style={styles.label}>{stat.label}</Text>
+                <Text style={[styles.value, color ? { color } : undefined]}>
+                  {stat.value}
+                </Text>
+                {color && <View style={[styles.colorDot, { backgroundColor: color }]} />}
+              </View>
+            );
+          })}
         </View>
+        <View style={styles.divider} />
         <View style={styles.row}>
-          {statRows.slice(5, 10).map((stat) => (
-            <View key={stat.label} style={styles.cell}>
-              <Text style={styles.label}>{stat.label}</Text>
-              <Text style={styles.value}>{stat.value}</Text>
-            </View>
-          ))}
+          {statRows.slice(5, 10).map((stat) => {
+            const color = getStatColor(stat.label, stat.value);
+            return (
+              <View key={stat.label} style={styles.cell}>
+                <Text style={styles.label}>{stat.label}</Text>
+                <Text style={[styles.value, color ? { color } : undefined]}>
+                  {stat.value}
+                </Text>
+                {color && <View style={[styles.colorDot, { backgroundColor: color }]} />}
+              </View>
+            );
+          })}
         </View>
       </View>
       {stats.gamesPlayed > 0 && (
@@ -63,57 +99,65 @@ export const StatsTable: React.FC<StatsTableProps> = ({ stats, title }) => {
           Based on {stats.gamesPlayed} game{stats.gamesPlayed !== 1 ? 's' : ''}
         </Text>
       )}
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.white,
-    padding: 16,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: SPACING.md,
+    marginVertical: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOW.md,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.gray,
-    marginBottom: 12,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  table: {
-  },
+  table: {},
   row: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 12,
+    paddingVertical: SPACING.sm,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.borderLight,
+    marginHorizontal: SPACING.sm,
   },
   cell: {
     alignItems: 'center',
     minWidth: 50,
   },
   label: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   value: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  colorDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
   },
   games: {
-    fontSize: 11,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: SPACING.md,
     fontStyle: 'italic',
   },
 });

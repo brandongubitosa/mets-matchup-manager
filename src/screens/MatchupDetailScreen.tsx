@@ -4,12 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants';
-import { StatsTable } from '../components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
+import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard } from '../components';
 import { MatchupResult, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
 import { getBatterVsPitcher } from '../services/mlbApi';
 
@@ -83,123 +84,196 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
     }
   };
 
+  const getHeadshotUrl = (playerId: number): string =>
+    `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${playerId}/headshot/67/current`;
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer} accessibilityRole="progressbar" accessibilityLabel="Loading matchup data">
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading matchup data...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>&#8249; Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.loadingHeaderText}>Loading matchup...</Text>
+        </LinearGradient>
+        <SkeletonStatsTable />
+        <SkeletonStatsTable />
+      </SafeAreaView>
     );
   }
 
   if (error || !matchup) {
     return (
-      <View style={styles.errorContainer} accessibilityRole="alert">
-        <Text style={styles.errorIcon}>⚠️</Text>
-        <Text style={styles.errorText}>{error || 'Something went wrong'}</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>&#8249; Back</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+        <View style={styles.errorContainer} accessibilityRole="alert">
+          <Text style={styles.errorIcon}>&#9888;&#65039;</Text>
+          <Text style={styles.errorText}>{error || 'Something went wrong'}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.retryBtnText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   const advantage = getAdvantageText();
   const { stats } = matchup;
 
-  // Calculate rates safely with guards against division by zero
   const kRate = safeDivide(stats.strikeouts, stats.atBats) * 100;
   const walkDenominator = stats.atBats + stats.walks;
   const walkRate = safeDivide(stats.walks, walkDenominator) * 100;
   const hrRate = safeDivide(stats.homeRuns, stats.atBats) * 100;
-  const singles = stats.hits - stats.doubles - stats.triples - stats.homeRuns;
+  const avg = parseFloat(stats.avg) || 0;
+  const obp = parseFloat(stats.obp) || 0;
+  const slg = parseFloat(stats.slg) || 0;
+  const ops = parseFloat(stats.ops) || 0;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <View style={styles.header} accessibilityRole="header">
+        <LinearGradient
+          colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
+          style={styles.header}
+        >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>&#8249; Back</Text>
+          </TouchableOpacity>
+
           <View style={styles.vsContainer}>
-            <View style={styles.playerBox} accessibilityLabel={`Batter: ${matchup.batter.fullName}`}>
+            <View style={styles.playerBox}>
+              <View style={styles.headshotContainer}>
+                <Image
+                  source={{ uri: getHeadshotUrl(matchup.batter.id) }}
+                  style={styles.headshot}
+                  resizeMode="cover"
+                />
+              </View>
               <Text style={styles.playerLabel}>BATTER</Text>
               <Text style={styles.playerName}>{matchup.batter.fullName}</Text>
               {matchup.batter.batSide && (
                 <Text style={styles.playerDetail}>
-                  {matchup.batter.batSide.code === 'S'
-                    ? 'Switch Hitter'
-                    : `Bats ${matchup.batter.batSide.description}`}
+                  {matchup.batter.batSide.code === 'S' ? 'Switch' : `Bats ${matchup.batter.batSide.code}`}
                 </Text>
               )}
             </View>
 
-            <View style={styles.vsCircle} accessibilityLabel="versus">
+            <View style={styles.vsCircle}>
               <Text style={styles.vsText}>VS</Text>
             </View>
 
-            <View style={styles.playerBox} accessibilityLabel={`Pitcher: ${matchup.pitcher.fullName}`}>
+            <View style={styles.playerBox}>
+              <View style={styles.headshotContainer}>
+                <Image
+                  source={{ uri: getHeadshotUrl(matchup.pitcher.id) }}
+                  style={styles.headshot}
+                  resizeMode="cover"
+                />
+              </View>
               <Text style={styles.playerLabel}>PITCHER</Text>
               <Text style={styles.playerName}>{matchup.pitcher.fullName}</Text>
               {matchup.pitcher.pitchHand && (
-                <Text style={styles.playerDetail}>
-                  Throws {matchup.pitcher.pitchHand.description}
-                </Text>
+                <Text style={styles.playerDetail}>Throws {matchup.pitcher.pitchHand.code}</Text>
               )}
             </View>
           </View>
 
           {advantage && (
-            <View
-              style={[styles.advantageBadge, { backgroundColor: advantage.color }]}
-              accessibilityRole="text"
-              accessibilityLabel={`Matchup assessment: ${advantage.text}`}
-            >
+            <View style={[styles.advantageBadge, { backgroundColor: advantage.color }]}>
               <Text style={styles.advantageText}>{advantage.text}</Text>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
-        <StatsTable stats={matchup.stats} title="Career Head-to-Head" />
+        <AnimatedCard delay={0}>
+          <StatsTable stats={matchup.stats} title="Career Head-to-Head" />
+        </AnimatedCard>
 
         {stats.atBats > 0 && (
-          <View style={styles.breakdown} accessibilityRole="region" accessibilityLabel="Quick analysis section">
-            <Text style={styles.breakdownTitle}>Quick Analysis</Text>
-            <View style={styles.analysisGrid}>
-              <View style={styles.analysisItem} accessibilityLabel={`Strikeout rate: ${kRate.toFixed(0)} percent`}>
-                <Text style={styles.analysisValue}>{kRate.toFixed(0)}%</Text>
-                <Text style={styles.analysisLabel}>K Rate</Text>
-              </View>
-              <View style={styles.analysisItem} accessibilityLabel={`Walk rate: ${walkRate.toFixed(0)} percent`}>
-                <Text style={styles.analysisValue}>{walkRate.toFixed(0)}%</Text>
-                <Text style={styles.analysisLabel}>Walk Rate</Text>
-              </View>
-              <View style={styles.analysisItem} accessibilityLabel={`Home run rate: ${hrRate.toFixed(1)} percent`}>
-                <Text style={styles.analysisValue}>{hrRate.toFixed(1)}%</Text>
-                <Text style={styles.analysisLabel}>HR Rate</Text>
-              </View>
-              <View style={styles.analysisItem} accessibilityLabel={`Singles: ${singles}`}>
-                <Text style={styles.analysisValue}>{singles}</Text>
-                <Text style={styles.analysisLabel}>Singles</Text>
+          <AnimatedCard delay={150}>
+            <View style={styles.statBarsContainer}>
+              <Text style={styles.statBarsTitle}>Performance Breakdown</Text>
+              <StatBar
+                label="AVG"
+                value={avg}
+                maxValue={0.5}
+                displayValue={stats.avg}
+                thresholds={{ good: 0.3, average: 0.25 }}
+              />
+              <StatBar
+                label="OBP"
+                value={obp}
+                maxValue={0.6}
+                displayValue={stats.obp}
+                thresholds={{ good: 0.35, average: 0.3 }}
+              />
+              <StatBar
+                label="SLG"
+                value={slg}
+                maxValue={0.8}
+                displayValue={stats.slg}
+                thresholds={{ good: 0.45, average: 0.35 }}
+              />
+              <StatBar
+                label="OPS"
+                value={ops}
+                maxValue={1.2}
+                displayValue={stats.ops}
+                thresholds={{ good: 0.8, average: 0.7 }}
+              />
+            </View>
+          </AnimatedCard>
+        )}
+
+        {stats.atBats > 0 && (
+          <AnimatedCard delay={300}>
+            <View style={styles.breakdown}>
+              <Text style={styles.breakdownTitle}>Quick Analysis</Text>
+              <View style={styles.analysisGrid}>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisValue}>{kRate.toFixed(0)}%</Text>
+                  <Text style={styles.analysisLabel}>K Rate</Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisValue}>{walkRate.toFixed(0)}%</Text>
+                  <Text style={styles.analysisLabel}>BB Rate</Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisValue}>{hrRate.toFixed(1)}%</Text>
+                  <Text style={styles.analysisLabel}>HR Rate</Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisValue}>{stats.hits - stats.doubles - stats.triples - stats.homeRuns}</Text>
+                  <Text style={styles.analysisLabel}>Singles</Text>
+                </View>
               </View>
             </View>
-          </View>
+          </AnimatedCard>
         )}
 
         {stats.atBats === 0 && (
-          <View style={styles.noDataContainer} accessibilityRole="region" accessibilityLabel="No matchup history">
-            <Text style={styles.noDataIcon}>📊</Text>
-            <Text style={styles.noDataTitle}>No Previous Matchups</Text>
-            <Text style={styles.noDataText}>
-              These players haven't faced each other in recorded MLB history.
-              {'\n\n'}
-              This could mean it's the first time they'll meet, or one player
-              was in the minors when the other was active.
-            </Text>
-          </View>
+          <AnimatedCard delay={150}>
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataIcon}>&#128202;</Text>
+              <Text style={styles.noDataTitle}>No Previous Matchups</Text>
+              <Text style={styles.noDataText}>
+                These players haven't faced each other in recorded MLB history.
+                This could mean it's the first time they'll meet.
+              </Text>
+            </View>
+          </AnimatedCard>
         )}
 
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="Select another matchup"
+          activeOpacity={0.8}
         >
-          <Text style={styles.backButtonText}>← Select Another Matchup</Text>
+          <Text style={styles.backButtonText}>&#8592; Select Another Matchup</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -212,10 +286,29 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
   },
+
+  // Back button
+  backBtn: {
+    marginBottom: SPACING.md,
+  },
+  backBtnText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.base,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  loadingHeaderText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: SPACING.md,
+  },
+
+  // VS section
   vsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -225,65 +318,98 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  headshotContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.primaryLight,
+  },
+  headshot: {
+    width: 64,
+    height: 64,
+  },
   playerLabel: {
-    fontSize: 10,
-    color: COLORS.secondary,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.secondaryLight,
     letterSpacing: 2,
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
+    fontWeight: '700',
   },
   playerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.base,
+    fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
   },
   playerDetail: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.lightGray,
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   vsCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 12,
+    marginHorizontal: SPACING.sm,
+    ...SHADOW.md,
   },
   vsText: {
     color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 14,
+    fontWeight: '800',
+    fontSize: FONT_SIZE.md,
   },
+
+  // Advantage badge
   advantageBadge: {
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 16,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.md,
   },
   advantageText: {
     color: COLORS.white,
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.sm,
   },
+
+  // Stat bars
+  statBarsContainer: {
+    backgroundColor: COLORS.white,
+    margin: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOW.md,
+  },
+  statBarsTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+
+  // Quick analysis
   breakdown: {
     backgroundColor: COLORS.white,
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    margin: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOW.md,
   },
   breakdownTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.gray,
-    marginBottom: 16,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -295,79 +421,90 @@ const styles = StyleSheet.create({
   analysisItem: {
     alignItems: 'center',
     width: '25%',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   analysisValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
     color: COLORS.primary,
   },
   analysisLabel: {
-    fontSize: 10,
-    color: COLORS.gray,
-    marginTop: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+    fontWeight: '600',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.gray,
-  },
+
+  // Error state
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
-    padding: 32,
+    padding: SPACING.xl,
   },
   errorIcon: {
     fontSize: 48,
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   errorText: {
-    fontSize: 16,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: SPACING.md,
   },
+  retryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    marginTop: SPACING.sm,
+  },
+  retryBtnText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: FONT_SIZE.base,
+  },
+
+  // No data
   noDataContainer: {
     backgroundColor: COLORS.white,
-    margin: 16,
-    padding: 24,
-    borderRadius: 12,
+    margin: SPACING.md,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
+    ...SHADOW.sm,
   },
   noDataIcon: {
     fontSize: 48,
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   noDataTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginBottom: 8,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
   },
   noDataText: {
-    fontSize: 14,
-    color: COLORS.gray,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
   },
+
+  // Back button at bottom
   backButton: {
     backgroundColor: COLORS.primary,
-    margin: 16,
-    marginTop: 8,
-    padding: 16,
-    borderRadius: 12,
+    margin: SPACING.md,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
+    ...SHADOW.sm,
   },
   backButtonText: {
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.base,
+    fontWeight: '700',
   },
 });

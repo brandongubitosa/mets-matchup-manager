@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { COLORS, MLB_TEAMS } from '../constants';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
+import { TeamLogo } from './TeamLogo';
 
 interface TeamPickerProps {
   selectedTeamId: number | null;
@@ -21,26 +22,35 @@ export const TeamPicker: React.FC<TeamPickerProps> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Select Opposing Team</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-        {teams.map((team) => (
-          <TouchableOpacity
-            key={team.id}
-            style={[
-              styles.teamChip,
-              selectedTeamId === team.id && styles.selectedChip,
-            ]}
-            onPress={() => onSelectTeam(team.id)}
-          >
-            <Text
+      <ScrollView
+        contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={false}
+      >
+        {teams.map((team) => {
+          const isSelected = selectedTeamId === team.id;
+          return (
+            <TouchableOpacity
+              key={team.id}
               style={[
-                styles.teamAbbr,
-                selectedTeamId === team.id && styles.selectedText,
+                styles.teamCell,
+                isSelected && styles.teamCellSelected,
+                Platform.OS === 'web' ? { cursor: 'pointer' as unknown as undefined } : {},
               ]}
+              onPress={() => onSelectTeam(team.id)}
+              activeOpacity={0.7}
             >
-              {team.abbreviation}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <TeamLogo teamId={team.id} size={36} />
+              <Text
+                style={[
+                  styles.teamAbbr,
+                  isSelected && styles.teamAbbrSelected,
+                ]}
+              >
+                {team.abbreviation}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -48,39 +58,43 @@ export const TeamPicker: React.FC<TeamPickerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 8,
+    flex: 1,
+    paddingTop: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginLeft: 16,
-    marginBottom: 8,
-    marginTop: 8,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.md,
+    marginBottom: SPACING.sm,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    fontWeight: '600',
   },
-  scroll: {
-    paddingHorizontal: 12,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING.sm,
+    paddingBottom: SPACING.lg,
   },
-  teamChip: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+  teamCell: {
+    width: '25%',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+    borderRadius: RADIUS.md,
   },
-  selectedChip: {
-    backgroundColor: COLORS.primary,
+  teamCellSelected: {
+    backgroundColor: `${COLORS.primary}12`,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
   teamAbbr: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.black,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.xs,
   },
-  selectedText: {
-    color: COLORS.white,
+  teamAbbrSelected: {
+    color: COLORS.primary,
   },
 });
