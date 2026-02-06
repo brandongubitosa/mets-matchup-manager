@@ -11,6 +11,7 @@ import {
 import { ErrorBoundary, WebContainer } from './src/components';
 import { COLORS } from './src/constants';
 import { RootStackParamList } from './src/types';
+import { Analytics } from '@vercel/analytics/react';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -57,6 +58,7 @@ export default function App() {
           </Stack.Navigator>
         </NavigationContainer>
       </WebContainer>
+      <Analytics />
     </ErrorBoundary>
   );
 }
