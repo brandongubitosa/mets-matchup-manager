@@ -8,6 +8,10 @@ import {
   MLBPlayerResponse,
   MLBStatsResponse,
   ApiResult,
+  PitcherSeasonStats,
+  BatterPredictionItem,
+  TeamPredictionData,
+  GamePredictionResult,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -453,4 +457,284 @@ export const getOpposingPitcherForTeam = async (gameId: number, teamId: number):
 // Legacy: Get opposing starting pitcher for today's game (Mets)
 export const getOpposingPitcher = async (gameId: number): Promise<ApiResult<Player>> => {
   return getOpposingPitcherForTeam(gameId, METS_TEAM_ID);
+};
+
+// ─── Game Prediction ────────────────────────────────────────────────────────
+
+const calculatePitcherStats = (stats: Record<string, unknown>): PitcherSeasonStats => ({
+  era: stats.era ? parseFloat(stats.era as string).toFixed(2) : '0.00',
+  whip: stats.whip ? parseFloat(stats.whip as string).toFixed(2) : '0.00',
+  strikeouts: (stats.strikeOuts as number) ?? 0,
+  walks: (stats.baseOnBalls as number) ?? 0,
+  inningsPitched: (stats.inningsPitched as string) ?? '0.0',
+  gamesStarted: (stats.gamesStarted as number) ?? 0,
+});
+
+export const getPitcherSeasonStats = async (
+  pitcherId: number
+): Promise<ApiResult<{ player: Player; stats: PitcherSeasonStats }>> => {
+  try {
+    const [playerRes, statsRes] = await Promise.all([
+      api.get<MLBPlayerResponse>(`/people/${pitcherId}`),
+      api.get(`/people/${pitcherId}/stats?stats=season&group=pitching`),
+    ]);
+
+    const personData = playerRes.data?.people?.[0];
+    if (!personData) return { success: false, error: 'Pitcher not found' };
+
+    const statSplit = statsRes.data?.stats?.[0]?.splits?.[0]?.stat;
+
+    return {
+      success: true,
+      data: {
+        player: {
+          id: personData.id,
+          fullName: personData.fullName,
+          firstName: personData.firstName,
+          lastName: personData.lastName,
+          position: personData.primaryPosition,
+          pitchHand: personData.pitchHand,
+        },
+        stats: statSplit
+          ? calculatePitcherStats(statSplit)
+          : { era: '0.00', whip: '0.00', strikeouts: 0, walks: 0, inningsPitched: '0.0', gamesStarted: 0 },
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+const LEAGUE_AVG_OPS = 0.720;
+
+const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
+
+const pitcherEraFactor = (era: string): number => {
+  const eraNum = parseFloat(era);
+  if (!eraNum || eraNum === 0) return 1.0;
+  return clamp(4.5 / eraNum, 0.6, 1.8);
+};
+
+const platoonTag = (
+  batCode: string | undefined,
+  pitchCode: string | undefined
+): BatterPredictionItem['platoonAdvantage'] => {
+  if (!batCode || !pitchCode) return 'neutral';
+  if (batCode === 'S') return 'switch';
+  if (batCode !== pitchCode) return 'advantage';
+  return 'disadvantage';
+};
+
+const platoonMultiplier = (tag: BatterPredictionItem['platoonAdvantage']): number => {
+  switch (tag) {
+    case 'advantage': return 1.05;
+    case 'disadvantage': return 0.95;
+    case 'switch': return 1.02;
+    default: return 1.0;
+  }
+};
+
+interface BatterFetchResult {
+  batterId: number;
+  fullName: string;
+  batSide?: { code: string; description: string };
+  seasonOPS: number;
+  h2hOPS: number;
+  h2hAtBats: number;
+}
+
+const fetchBatterPredictionStats = async (
+  batter: RosterPlayer,
+  opposingPitcherId: number | undefined,
+  opposingPitchHand: string | undefined
+): Promise<BatterPredictionItem> => {
+  try {
+    const calls: Promise<unknown>[] = [
+      api.get<MLBStatsResponse>(`/people/${batter.id}/stats?stats=season&group=hitting`),
+      api.get<MLBPlayerResponse>(`/people/${batter.id}`),
+    ];
+    if (opposingPitcherId) {
+      calls.push(
+        api.get<MLBStatsResponse>(
+          `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting`
+        )
+      );
+    }
+
+    const results = await Promise.all(calls);
+    const seasonRes = results[0] as { data: MLBStatsResponse };
+    const playerRes = results[1] as { data: MLBPlayerResponse };
+    const h2hRes = results[2] as { data: MLBStatsResponse } | undefined;
+
+    const personData = playerRes.data?.people?.[0];
+    const batSide = personData?.batSide;
+
+    const seasonStat = seasonRes.data?.stats?.[0]?.splits?.[0]?.stat;
+    let seasonOPS = LEAGUE_AVG_OPS;
+    if (seasonStat) {
+      const calc = calculateStats(seasonStat as Parameters<typeof calculateStats>[0]);
+      const ops = parseFloat(calc.ops);
+      if (ops > 0) seasonOPS = ops;
+    }
+
+    let h2hOPS = 0;
+    let h2hAtBats = 0;
+    if (h2hRes) {
+      const h2hStat = h2hRes.data?.stats?.[0]?.splits?.[0]?.stat;
+      if (h2hStat) {
+        const calc = calculateStats(h2hStat as Parameters<typeof calculateStats>[0]);
+        h2hAtBats = h2hStat.atBats ?? 0;
+        if (h2hAtBats > 0) h2hOPS = parseFloat(calc.ops) || 0;
+      }
+    }
+
+    let effectiveOPS = seasonOPS;
+    if (h2hAtBats >= 5) {
+      effectiveOPS = h2hOPS * 0.5 + seasonOPS * 0.5;
+    } else if (h2hAtBats >= 2) {
+      effectiveOPS = h2hOPS * 0.25 + seasonOPS * 0.75;
+    }
+
+    const tag = platoonTag(batSide?.code, opposingPitchHand);
+    effectiveOPS = clamp(effectiveOPS * platoonMultiplier(tag), 0.3, 1.5);
+
+    return {
+      id: batter.id,
+      fullName: batter.fullName,
+      batSide,
+      seasonOPS,
+      h2hOPS,
+      h2hAtBats,
+      effectiveOPS,
+      platoonAdvantage: tag,
+    };
+  } catch {
+    return {
+      id: batter.id,
+      fullName: batter.fullName,
+      seasonOPS: LEAGUE_AVG_OPS,
+      h2hOPS: 0,
+      h2hAtBats: 0,
+      effectiveOPS: LEAGUE_AVG_OPS,
+      platoonAdvantage: 'neutral',
+    };
+  }
+};
+
+const buildTeamData = async (
+  teamId: number,
+  teamName: string,
+  pitcherId: number | undefined,
+  opposingPitcherId: number | undefined
+): Promise<TeamPredictionData> => {
+  const [rosterResult, pitcherResult] = await Promise.all([
+    getTeamBatters(teamId),
+    pitcherId ? getPitcherSeasonStats(pitcherId) : Promise.resolve(null),
+  ]);
+
+  const batters = rosterResult.slice(0, 9);
+  const pitcherData = pitcherResult && 'data' in pitcherResult && pitcherResult.success
+    ? pitcherResult.data
+    : null;
+
+  const pitchHand = pitcherData?.player?.pitchHand?.code;
+
+  const batterItems = await Promise.all(
+    batters.map((b) => fetchBatterPredictionStats(b, opposingPitcherId, pitchHand))
+  );
+
+  const offensiveScore =
+    batterItems.length > 0
+      ? batterItems.reduce((sum, b) => sum + b.effectiveOPS, 0) / batterItems.length
+      : LEAGUE_AVG_OPS;
+
+  return {
+    teamId,
+    teamName,
+    pitcher: pitcherData?.player ?? null,
+    pitcherStats: pitcherData?.stats ?? null,
+    batters: batterItems,
+    offensiveScore,
+  };
+};
+
+export const predictGame = async (params: {
+  homeTeamId: number;
+  homeTeamName: string;
+  awayTeamId: number;
+  awayTeamName: string;
+  homePitcherId?: number;
+  awayPitcherId?: number;
+}): Promise<ApiResult<GamePredictionResult>> => {
+  try {
+    const { homeTeamId, homeTeamName, awayTeamId, awayTeamName, homePitcherId, awayPitcherId } = params;
+
+    const [homeData, awayData] = await Promise.all([
+      buildTeamData(homeTeamId, homeTeamName, homePitcherId, awayPitcherId),
+      buildTeamData(awayTeamId, awayTeamName, awayPitcherId, homePitcherId),
+    ]);
+
+    const homePitcherFactor = homeData.pitcherStats ? pitcherEraFactor(homeData.pitcherStats.era) : 1.0;
+    const awayPitcherFactor = awayData.pitcherStats ? pitcherEraFactor(awayData.pitcherStats.era) : 1.0;
+
+    const homeRunExp = homeData.offensiveScore * awayPitcherFactor;
+    const awayRunExp = awayData.offensiveScore * homePitcherFactor;
+    const total = homeRunExp + awayRunExp;
+    const baseProbHome = total > 0 ? homeRunExp / total : 0.5;
+    // 5% home field advantage
+    const homeWinProbability = clamp(baseProbHome * 0.95 + 0.05, 0.01, 0.99);
+    const predictedWinner: 'home' | 'away' = homeWinProbability >= 0.5 ? 'home' : 'away';
+    const confidence = Math.abs(homeWinProbability - 0.5) * 2;
+
+    // Build key factors
+    const keyFactors: string[] = [];
+
+    const homeAdvCount = homeData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
+    const awayAdvCount = awayData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
+    if (homeAdvCount > awayAdvCount) {
+      keyFactors.push(`${homeTeamName} has ${homeAdvCount} platoon matchup advantages`);
+    } else if (awayAdvCount > homeAdvCount) {
+      keyFactors.push(`${awayTeamName} has ${awayAdvCount} platoon matchup advantages`);
+    }
+
+    const homeH2H = homeData.batters.filter((b) => b.h2hAtBats >= 5).length;
+    const awayH2H = awayData.batters.filter((b) => b.h2hAtBats >= 5).length;
+    if (homeH2H + awayH2H > 0) {
+      keyFactors.push(`${homeH2H + awayH2H} batters have significant head-to-head history`);
+    }
+
+    if (homeData.pitcherStats && awayData.pitcherStats) {
+      const homeEra = parseFloat(homeData.pitcherStats.era);
+      const awayEra = parseFloat(awayData.pitcherStats.era);
+      if (homeEra < awayEra - 0.5) {
+        keyFactors.push(`${homeTeamName}'s starter has a significant ERA edge (${homeData.pitcherStats.era} vs ${awayData.pitcherStats.era})`);
+      } else if (awayEra < homeEra - 0.5) {
+        keyFactors.push(`${awayTeamName}'s starter has a significant ERA edge (${awayData.pitcherStats.era} vs ${homeData.pitcherStats.era})`);
+      }
+    }
+
+    if (homeData.offensiveScore > awayData.offensiveScore + 0.05) {
+      keyFactors.push(`${homeTeamName}'s lineup projects stronger against this pitching`);
+    } else if (awayData.offensiveScore > homeData.offensiveScore + 0.05) {
+      keyFactors.push(`${awayTeamName}'s lineup projects stronger against this pitching`);
+    }
+
+    if (keyFactors.length === 0) {
+      keyFactors.push('Both teams are evenly matched in this matchup');
+    }
+
+    return {
+      success: true,
+      data: {
+        homeTeam: homeData,
+        awayTeam: awayData,
+        predictedWinner,
+        homeWinProbability,
+        confidence,
+        keyFactors,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
 };

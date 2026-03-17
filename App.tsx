@@ -7,6 +7,7 @@ import {
   BatterMatchupScreen,
   PitcherMatchupScreen,
   MatchupDetailScreen,
+  GamePredictionScreen,
 } from './src/screens';
 import { ErrorBoundary, WebContainer } from './src/components';
 import { COLORS } from './src/constants';
@@ -54,6 +55,11 @@ export default function App() {
               name="MatchupDetail"
               component={MatchupDetailScreen}
               options={{ title: 'Matchup Details', headerShown: false }}
+            />
+            <Stack.Screen
+              name="GamePrediction"
+              component={GamePredictionScreen}
+              options={{ title: 'Game Prediction', headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>

@@ -6,6 +6,15 @@ export type RootStackParamList = {
   BatterMatchup: { teamId: number; teamName: string };
   PitcherMatchup: { teamId: number; teamName: string };
   MatchupDetail: { batterId: number; pitcherId: number; mode: 'batter' | 'pitcher' };
+  GamePrediction: {
+    teamId: number;
+    teamName: string;
+    opponentTeamId: number;
+    opponentTeamName: string;
+    isHome: boolean;
+    teamPitcherId?: number;
+    opponentPitcherId?: number;
+  };
 };
 
 export type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -15,3 +24,5 @@ export type PitcherMatchupScreenNavigationProp = NativeStackNavigationProp<RootS
 export type PitcherMatchupScreenRouteProp = RouteProp<RootStackParamList, 'PitcherMatchup'>;
 export type MatchupDetailScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MatchupDetail'>;
 export type MatchupDetailScreenRouteProp = RouteProp<RootStackParamList, 'MatchupDetail'>;
+export type GamePredictionScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'GamePrediction'>;
+export type GamePredictionScreenRouteProp = RouteProp<RootStackParamList, 'GamePrediction'>;

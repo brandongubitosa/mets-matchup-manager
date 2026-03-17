@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
-import { HomeScreenNavigationProp } from '../types';
+import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
 import { usePersistedTeam } from '../hooks';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
 
@@ -182,6 +182,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               navigation.navigate('BatterMatchup', {
                 teamId: selectedTeam.id,
                 teamName: selectedTeam.name,
+              });
+            }}
+            onPredictGame={(game: TodaysGame, opposingPitcher: Player | null) => {
+              navigation.navigate('GamePrediction', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+                opponentTeamId: game.opponent.id,
+                opponentTeamName: game.opponent.name,
+                isHome: game.isHome,
+                opponentPitcherId: opposingPitcher?.id,
               });
             }}
           />

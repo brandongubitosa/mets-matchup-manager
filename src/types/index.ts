@@ -158,6 +158,44 @@ export interface MLBStatsResponse {
   }>;
 }
 
+export interface PitcherSeasonStats {
+  era: string;
+  whip: string;
+  strikeouts: number;
+  walks: number;
+  inningsPitched: string;
+  gamesStarted: number;
+}
+
+export interface BatterPredictionItem {
+  id: number;
+  fullName: string;
+  batSide?: { code: string; description: string };
+  seasonOPS: number;
+  h2hOPS: number;
+  h2hAtBats: number;
+  effectiveOPS: number;
+  platoonAdvantage: 'advantage' | 'disadvantage' | 'neutral' | 'switch';
+}
+
+export interface TeamPredictionData {
+  teamId: number;
+  teamName: string;
+  pitcher: Player | null;
+  pitcherStats: PitcherSeasonStats | null;
+  batters: BatterPredictionItem[];
+  offensiveScore: number;
+}
+
+export interface GamePredictionResult {
+  homeTeam: TeamPredictionData;
+  awayTeam: TeamPredictionData;
+  predictedWinner: 'home' | 'away';
+  homeWinProbability: number;
+  confidence: number;
+  keyFactors: string[];
+}
+
 // Custom error class for API errors
 export class ApiError extends Error {
   constructor(message: string, public readonly originalError?: unknown) {

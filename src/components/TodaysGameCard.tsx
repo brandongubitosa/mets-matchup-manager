@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { useTodaysGame } from '../hooks';
+import { TodaysGame, Player } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { SkeletonGameCard } from './SkeletonLoader';
 
@@ -10,6 +11,7 @@ interface TodaysGameCardProps {
   teamId: number;
   teamName: string;
   onViewMatchups?: (opponentId: number, opponentName: string) => void;
+  onPredictGame?: (game: TodaysGame, opposingPitcher: Player | null) => void;
 }
 
 const formatGameTime = (isoString: string): string => {
@@ -52,6 +54,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   teamId,
   teamName,
   onViewMatchups,
+  onPredictGame,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
 
@@ -152,6 +155,18 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             <Text style={styles.viewMatchupsText}>View Matchups vs {opponentAbbr}</Text>
             <Text style={styles.viewMatchupsArrow}>›</Text>
           </LinearGradient>
+        </TouchableOpacity>
+      )}
+      {onPredictGame && (
+        <TouchableOpacity
+          style={styles.predictButton}
+          onPress={() => onPredictGame(game, opposingPitcher)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Predict game outcome"
+        >
+          <Text style={styles.predictButtonText}>Predict Game Outcome</Text>
+          <Text style={styles.predictButtonArrow}>›</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -288,6 +303,25 @@ const styles = StyleSheet.create({
   },
   viewMatchupsArrow: {
     color: COLORS.white,
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '700',
+  },
+  predictButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.background,
+    gap: SPACING.xs,
+  },
+  predictButtonText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.sm,
+  },
+  predictButtonArrow: {
+    color: COLORS.primary,
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
   },
