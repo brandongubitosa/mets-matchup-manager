@@ -116,15 +116,18 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
           <FlatList
             data={filteredPitchers}
             keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.cardRow}
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard
                   player={item}
+                  variant="card"
                   onPress={() => handleSelectPitcher(item)}
                 />
               </AnimatedCard>
             )}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={styles.cardGrid}
           />
         </>
       ) : !selectedTeamId ? (
@@ -132,6 +135,7 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
           <View style={styles.selectedPlayer}>
             <PlayerCard
               player={selectedPitcher}
+              variant="list"
               selected
               onPress={() => setSelectedPitcher(null)}
             />
@@ -179,15 +183,18 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
               <FlatList
                 data={filteredBatters}
                 keyExtractor={(item) => item.id.toString()}
+                numColumns={2}
+                columnWrapperStyle={styles.cardRow}
                 renderItem={({ item, index }) => (
                   <AnimatedCard delay={index * 40}>
                     <PlayerCard
                       player={item}
+                      variant="card"
                       onPress={() => handleSelectBatter(item)}
                     />
                   </AnimatedCard>
                 )}
-                contentContainerStyle={styles.list}
+                contentContainerStyle={styles.cardGrid}
                 ListEmptyComponent={
                   <Text style={styles.emptyText}>No batters found</Text>
                 }
@@ -232,6 +239,15 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: SPACING.lg,
+  },
+  cardGrid: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.lg,
+    paddingTop: SPACING.sm,
+  },
+  cardRow: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   skeletonContainer: {
     flex: 1,

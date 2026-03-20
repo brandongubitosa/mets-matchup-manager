@@ -10,6 +10,7 @@ import {
   TextInput,
   Animated,
   Image,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,10 +24,7 @@ type HomeScreenProps = {
 };
 
 const teamList = Object.entries(MLB_TEAMS)
-  .map(([id, team]) => ({
-    id: parseInt(id),
-    ...team,
-  }))
+  .map(([id, team]) => ({ id: parseInt(id), ...team }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
@@ -38,17 +36,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(logoScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 12,
-        bounciness: 8,
-      }),
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
+      Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, speed: 12, bounciness: 8 }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
   }, [logoScale, logoOpacity]);
 
@@ -63,10 +52,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <LinearGradient
-          colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
-          style={styles.loadingContainer}
-        >
+        <LinearGradient colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]} style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.white} />
         </LinearGradient>
       </SafeAreaView>
@@ -75,14 +61,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ── Hero Header ── */}
       <LinearGradient
         colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
         style={styles.header}
       >
-        <Animated.View
-          style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}
-        >
-          <TeamLogo teamId={selectedTeam.id} size={80} />
+        {/* Decorative circles */}
+        <View style={styles.decorCircle1} />
+        <View style={styles.decorCircle2} />
+
+        <Animated.View style={[styles.logoWrapper, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}>
+          <TeamLogo teamId={selectedTeam.id} size={88} />
         </Animated.View>
 
         <TouchableOpacity
@@ -92,25 +81,115 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           accessibilityRole="button"
           accessibilityLabel="Change team"
         >
-          <Text style={styles.title}>{selectedTeam.abbreviation} Matchup</Text>
-          <View style={styles.dropdownBadge}>
-            <Text style={styles.dropdownArrow}>▼</Text>
+          <Text style={styles.heroTitle}>{selectedTeam.abbreviation}</Text>
+          <Text style={styles.heroSubtitle}>Matchup Manager</Text>
+          <View style={styles.changeTeamPill}>
+            <Text style={styles.changeTeamText}>Change Team  ▼</Text>
           </View>
         </TouchableOpacity>
-        <Text style={styles.subtitle}>Manager</Text>
       </LinearGradient>
 
-      {/* Team Picker Modal */}
+      {/* ── Content ── */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Today's Game */}
+        <AnimatedCard delay={0}>
+          <TodaysGameCard
+            teamId={selectedTeam.id}
+            teamName={selectedTeam.name}
+            onViewMatchups={() =>
+              navigation.navigate('BatterMatchup', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+              })
+            }
+            onPredictGame={(game: TodaysGame, opposingPitcher: Player | null) =>
+              navigation.navigate('GamePrediction', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+                opponentTeamId: game.opponent.id,
+                opponentTeamName: game.opponent.name,
+                isHome: game.isHome,
+                opponentPitcherId: opposingPitcher?.id,
+              })
+            }
+          />
+        </AnimatedCard>
+
+        {/* Section label */}
+        <Text style={styles.sectionLabel}>MATCHUP TOOLS</Text>
+
+        {/* 2-column feature cards */}
+        <View style={styles.featureRow}>
+          <AnimatedCard
+            delay={100}
+            onPress={() =>
+              navigation.navigate('BatterMatchup', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+              })
+            }
+          >
+            <LinearGradient
+              colors={[COLORS.primaryDark, COLORS.primary]}
+              style={styles.featureCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.featureIconCircle}>
+                <Text style={styles.featureIcon}>💥</Text>
+              </View>
+              <Text style={styles.featureTitle}>Batters</Text>
+              <Text style={styles.featureDesc}>Hitters vs opposing pitchers</Text>
+              <View style={styles.featureArrow}>
+                <Text style={styles.featureArrowText}>›</Text>
+              </View>
+            </LinearGradient>
+          </AnimatedCard>
+
+          <AnimatedCard
+            delay={180}
+            onPress={() =>
+              navigation.navigate('PitcherMatchup', {
+                teamId: selectedTeam.id,
+                teamName: selectedTeam.name,
+              })
+            }
+          >
+            <LinearGradient
+              colors={[COLORS.secondary, '#A0001F']}
+              style={styles.featureCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.featureIconCircle}>
+                <Text style={styles.featureIcon}>⚾</Text>
+              </View>
+              <Text style={styles.featureTitle}>Pitchers</Text>
+              <Text style={styles.featureDesc}>Starters vs opposing lineups</Text>
+              <View style={styles.featureArrow}>
+                <Text style={styles.featureArrowText}>›</Text>
+              </View>
+            </LinearGradient>
+          </AnimatedCard>
+        </View>
+
+        {/* Footer */}
+        <Text style={styles.footerText}>Data from MLB Stats API</Text>
+      </ScrollView>
+
+      {/* ── Team Picker Modal ── */}
       <Modal visible={showPicker} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Team</Text>
+              <Text style={styles.modalTitle}>Select Your Team</Text>
               <TouchableOpacity
-                onPress={() => {
-                  setShowPicker(false);
-                  setTeamSearch('');
-                }}
+                onPress={() => { setShowPicker(false); setTeamSearch(''); }}
                 style={styles.modalCloseIcon}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
@@ -143,21 +222,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 return (
                   <TouchableOpacity
                     style={[styles.teamOption, isSelected && styles.teamOptionSelected]}
-                    onPress={() => {
-                      setSelectedTeam(item);
-                      setShowPicker(false);
-                      setTeamSearch('');
-                    }}
+                    onPress={() => { setSelectedTeam(item); setShowPicker(false); setTeamSearch(''); }}
                     activeOpacity={0.6}
                   >
                     <TeamLogo teamId={item.id} size={36} />
                     <View style={styles.teamOptionInfo}>
-                      <Text
-                        style={[
-                          styles.teamOptionText,
-                          isSelected && styles.teamOptionTextSelected,
-                        ]}
-                      >
+                      <Text style={[styles.teamOptionText, isSelected && styles.teamOptionTextSelected]}>
                         {item.name}
                       </Text>
                       <Text style={styles.teamOptionAbbr}>{item.abbreviation}</Text>
@@ -171,86 +241,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-
-      {/* Content Area */}
-      <View style={styles.content}>
-        <AnimatedCard delay={0}>
-          <TodaysGameCard
-            teamId={selectedTeam.id}
-            teamName={selectedTeam.name}
-            onViewMatchups={() => {
-              navigation.navigate('BatterMatchup', {
-                teamId: selectedTeam.id,
-                teamName: selectedTeam.name,
-              });
-            }}
-            onPredictGame={(game: TodaysGame, opposingPitcher: Player | null) => {
-              navigation.navigate('GamePrediction', {
-                teamId: selectedTeam.id,
-                teamName: selectedTeam.name,
-                opponentTeamId: game.opponent.id,
-                opponentTeamName: game.opponent.name,
-                isHome: game.isHome,
-                opponentPitcherId: opposingPitcher?.id,
-              });
-            }}
-          />
-        </AnimatedCard>
-
-        <AnimatedCard
-          delay={100}
-          onPress={() =>
-            navigation.navigate('BatterMatchup', {
-              teamId: selectedTeam.id,
-              teamName: selectedTeam.name,
-            })
-          }
-        >
-          <View style={styles.card}>
-            <View style={[styles.cardIcon, { backgroundColor: COLORS.primary }]}>
-              <Text style={styles.iconText}>💥</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Batters</Text>
-              <Text style={styles.cardDescription}>
-                See how {selectedTeam.name} hitters perform against opposing pitchers
-              </Text>
-            </View>
-            <View style={styles.arrowContainer}>
-              <Text style={styles.arrow}>›</Text>
-            </View>
-          </View>
-        </AnimatedCard>
-
-        <AnimatedCard
-          delay={200}
-          onPress={() =>
-            navigation.navigate('PitcherMatchup', {
-              teamId: selectedTeam.id,
-              teamName: selectedTeam.name,
-            })
-          }
-        >
-          <View style={styles.card}>
-            <View style={[styles.cardIcon, { backgroundColor: COLORS.secondary }]}>
-              <Text style={styles.iconText}>⚾</Text>
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{selectedTeam.abbreviation} Pitchers</Text>
-              <Text style={styles.cardDescription}>
-                See how {selectedTeam.name} pitchers perform against opposing batters
-              </Text>
-            </View>
-            <View style={styles.arrowContainer}>
-              <Text style={styles.arrow}>›</Text>
-            </View>
-          </View>
-        </AnimatedCard>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Data from MLB Stats API</Text>
-      </View>
     </SafeAreaView>
   );
 };
@@ -258,112 +248,162 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primary,
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 36,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: FONT_SIZE.xxxl,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.secondary,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  content: {
-    flex: 1,
     backgroundColor: COLORS.background,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SPACING.lg,
-    paddingHorizontal: SPACING.md,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
-    ...SHADOW.md,
-  },
-  cardIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.md,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
   },
-  iconText: {
-    fontSize: 26,
+
+  // ── Hero Header ──────────────────────────────────────────────────────────
+  header: {
+    alignItems: 'center',
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl,
+    overflow: 'hidden',
   },
-  cardContent: {
+  decorCircle1: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    top: -60,
+    right: -60,
+  },
+  decorCircle2: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    bottom: -40,
+    left: -40,
+  },
+  logoWrapper: {
+    marginBottom: SPACING.md,
+    ...SHADOW.lg,
+  },
+  teamSelector: {
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: FONT_SIZE.hero,
+    fontWeight: '900',
+    color: COLORS.white,
+    letterSpacing: 2,
+  },
+  heroSubtitle: {
+    fontSize: FONT_SIZE.lg,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  changeTeamPill: {
+    marginTop: SPACING.md,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  changeTeamText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+
+  // ── Scroll Content ──────────────────────────────────────────────────────
+  scrollView: {
+    flex: 1,
+    marginTop: -SPACING.lg,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    paddingTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xxl,
+  },
+
+  sectionLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+
+  // ── Feature Cards (2-col) ───────────────────────────────────────────────
+  featureRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  featureCard: {
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    minHeight: 160,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  featureIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  featureIcon: {
+    fontSize: 24,
+  },
+  featureTitle: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: COLORS.white,
+    marginBottom: SPACING.xs,
+  },
+  featureDesc: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 16,
     flex: 1,
   },
-  cardTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 2,
-  },
-  cardDescription: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-  },
-  arrowContainer: {
+  featureArrow: {
+    alignSelf: 'flex-end',
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: COLORS.borderLight,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  arrow: {
-    fontSize: 22,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
-    marginTop: -2,
-  },
-  footer: {
-    backgroundColor: COLORS.background,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-  },
-
-  // Team selector
-  teamSelector: {
-    flexDirection: 'row',
     alignItems: 'center',
     marginTop: SPACING.sm,
   },
-  dropdownBadge: {
-    backgroundColor: COLORS.glassBg,
-    borderRadius: RADIUS.full,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: SPACING.sm,
-  },
-  dropdownArrow: {
+  featureArrowText: {
     color: COLORS.white,
-    fontSize: 10,
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '700',
+    marginTop: -2,
   },
 
-  // Modal
+  // ── Footer ───────────────────────────────────────────────────────────────
+  footerText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xl,
+  },
+
+  // ── Team Picker Modal ────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
@@ -373,8 +413,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
-    maxHeight: '80%',
+    maxHeight: '82%',
     paddingBottom: SPACING.xl,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.lightGray,
+    alignSelf: 'center',
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -465,11 +514,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: COLORS.primary,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

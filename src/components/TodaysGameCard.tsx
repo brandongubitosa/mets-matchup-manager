@@ -126,8 +126,10 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
 
       {opposingPitcher && (
         <View style={styles.pitcherInfo}>
-          <Text style={styles.pitcherLabel}>Probable Starter</Text>
-          <Text style={styles.pitcherName}>{opposingPitcher.fullName}</Text>
+          <Text style={styles.pitcherLabel}>Probable Starter  </Text>
+          <Text style={styles.pitcherName} numberOfLines={1} ellipsizeMode="tail">
+            {opposingPitcher.fullName}
+          </Text>
           {opposingPitcher.pitchHand && (
             <View style={styles.pitcherHandBadge}>
               <Text style={styles.pitcherHand}>
@@ -263,17 +265,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.md,
     gap: SPACING.xs,
   },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
+    flexShrink: 0,
   },
   pitcherName: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    flexShrink: 1,
   },
   pitcherHandBadge: {
     backgroundColor: `${COLORS.primary}12`,
