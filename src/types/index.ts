@@ -211,6 +211,31 @@ export interface GamePredictionResult {
   keyFactors: string[];
 }
 
+export interface RecentBatterStats {
+  games: number;
+  atBats: number;
+  hits: number;
+  homeRuns: number;
+  rbi: number;
+  strikeouts: number;
+  walks: number;
+  avg: string;
+  obp: string;
+  slg: string;
+  ops: string;
+}
+
+export interface RecentPitcherStats {
+  games: number;
+  inningsPitched: string;
+  earnedRuns: number;
+  strikeouts: number;
+  walks: number;
+  hits: number;
+  era: string;
+  whip: string;
+}
+
 export interface HotZone {
   zone: string;
   value: string; // batting average e.g. ".350"

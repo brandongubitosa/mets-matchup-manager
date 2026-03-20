@@ -16,6 +16,8 @@ import {
   PitcherArsenalPitch,
   PitchTypeStats,
   PitchArsenalMatchup,
+  RecentBatterStats,
+  RecentPitcherStats,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -461,6 +463,157 @@ export const getOpposingPitcherForTeam = async (gameId: number, teamId: number):
 // Legacy: Get opposing starting pitcher for today's game (Mets)
 export const getOpposingPitcher = async (gameId: number): Promise<ApiResult<Player>> => {
   return getOpposingPitcherForTeam(gameId, METS_TEAM_ID);
+};
+
+// ─── Recent Form ─────────────────────────────────────────────────────────────
+
+interface RawGameLogStat {
+  hits?: number;
+  atBats?: number;
+  homeRuns?: number;
+  rbi?: number;
+  strikeOuts?: number;
+  baseOnBalls?: number;
+  doubles?: number;
+  triples?: number;
+  hitByPitch?: number;
+  sacFlies?: number;
+  // pitching
+  earnedRuns?: number;
+  inningsPitched?: string;
+  baseOnBallsAllowed?: number;
+  hitsAllowed?: number;
+}
+
+// Convert "5.1" IP notation (5 full innings + 1 out) to total outs
+const ipToOuts = (ip: string): number => {
+  const [full, partial] = ip.split('.').map(Number);
+  return (full || 0) * 3 + (partial || 0);
+};
+
+const outsToIp = (outs: number): string => {
+  const full = Math.floor(outs / 3);
+  const partial = outs % 3;
+  return partial === 0 ? `${full}.0` : `${full}.${partial}`;
+};
+
+const aggregateBatterGames = (games: RawGameLogStat[]): RecentBatterStats => {
+  const ab = games.reduce((s, g) => s + (g.atBats ?? 0), 0);
+  const h = games.reduce((s, g) => s + (g.hits ?? 0), 0);
+  const bb = games.reduce((s, g) => s + (g.baseOnBalls ?? 0), 0);
+  const hbp = games.reduce((s, g) => s + (g.hitByPitch ?? 0), 0);
+  const sf = games.reduce((s, g) => s + (g.sacFlies ?? 0), 0);
+  const d = games.reduce((s, g) => s + (g.doubles ?? 0), 0);
+  const t = games.reduce((s, g) => s + (g.triples ?? 0), 0);
+  const hr = games.reduce((s, g) => s + (g.homeRuns ?? 0), 0);
+  const tb = h + d + t * 2 + hr * 3;
+
+  const avg = ab > 0 ? (h / ab).toFixed(3).replace('0.', '.') : '.000';
+  const obpDenom = ab + bb + hbp + sf;
+  const obp = obpDenom > 0
+    ? ((h + bb + hbp) / obpDenom).toFixed(3).replace('0.', '.')
+    : '.000';
+  const slg = ab > 0 ? (tb / ab).toFixed(3).replace('0.', '.') : '.000';
+  const opsVal = (parseFloat(obp) + parseFloat(slg)).toFixed(3).replace('0.', '.');
+
+  return {
+    games: games.length,
+    atBats: ab,
+    hits: h,
+    homeRuns: hr,
+    rbi: games.reduce((s, g) => s + (g.rbi ?? 0), 0),
+    strikeouts: games.reduce((s, g) => s + (g.strikeOuts ?? 0), 0),
+    walks: bb,
+    avg,
+    obp,
+    slg,
+    ops: opsVal,
+  };
+};
+
+const aggregatePitcherGames = (games: RawGameLogStat[]): RecentPitcherStats => {
+  const totalOuts = games.reduce((s, g) => s + ipToOuts(g.inningsPitched ?? '0.0'), 0);
+  const ip = outsToIp(totalOuts);
+  const er = games.reduce((s, g) => s + (g.earnedRuns ?? 0), 0);
+  const bb = games.reduce((s, g) => s + (g.baseOnBalls ?? 0), 0);
+  const h = games.reduce((s, g) => s + (g.hits ?? 0), 0);
+  const k = games.reduce((s, g) => s + (g.strikeOuts ?? 0), 0);
+
+  const ipFull = totalOuts / 3;
+  const era = ipFull > 0 ? ((er / ipFull) * 9).toFixed(2) : '0.00';
+  const whip = ipFull > 0 ? ((bb + h) / ipFull).toFixed(2) : '0.00';
+
+  return {
+    games: games.length,
+    inningsPitched: ip,
+    earnedRuns: er,
+    strikeouts: k,
+    walks: bb,
+    hits: h,
+    era,
+    whip,
+  };
+};
+
+export const getBatterRecentForm = async (
+  batterId: number,
+  season?: number
+): Promise<ApiResult<{ l7: RecentBatterStats; l15: RecentBatterStats; l30: RecentBatterStats }>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${batterId}/stats?stats=gameLog&group=hitting&season=${yr}`
+    );
+
+    const splits: Array<{ stat: RawGameLogStat }> = response.data?.stats?.[0]?.splits ?? [];
+    if (splits.length === 0) {
+      return { success: false, error: 'No game log data available' };
+    }
+
+    // Most recent games are at the end of the array
+    const recent = [...splits].reverse();
+
+    return {
+      success: true,
+      data: {
+        l7: aggregateBatterGames(recent.slice(0, 7).map((s) => s.stat)),
+        l15: aggregateBatterGames(recent.slice(0, 15).map((s) => s.stat)),
+        l30: aggregateBatterGames(recent.slice(0, 30).map((s) => s.stat)),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+export const getPitcherRecentForm = async (
+  pitcherId: number,
+  season?: number
+): Promise<ApiResult<{ l3: RecentPitcherStats; l5: RecentPitcherStats; l10: RecentPitcherStats }>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${yr}`
+    );
+
+    const splits: Array<{ stat: RawGameLogStat }> = response.data?.stats?.[0]?.splits ?? [];
+    if (splits.length === 0) {
+      return { success: false, error: 'No pitcher game log data available' };
+    }
+
+    const recent = [...splits].reverse();
+
+    return {
+      success: true,
+      data: {
+        l3: aggregatePitcherGames(recent.slice(0, 3).map((s) => s.stat)),
+        l5: aggregatePitcherGames(recent.slice(0, 5).map((s) => s.stat)),
+        l10: aggregatePitcherGames(recent.slice(0, 10).map((s) => s.stat)),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
 };
 
 // ─── Pitch Arsenal ───────────────────────────────────────────────────────────

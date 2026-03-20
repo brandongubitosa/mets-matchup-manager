@@ -13,3 +13,4 @@ export { StepIndicator } from './StepIndicator';
 export { StatBar } from './StatBar';
 export { StrikeZoneChart } from './StrikeZoneChart';
 export { PitchArsenalCard } from './PitchArsenalCard';
+export { RecentFormCard } from './RecentFormCard';
