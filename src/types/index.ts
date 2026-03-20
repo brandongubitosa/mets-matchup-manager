@@ -211,6 +211,21 @@ export interface GamePredictionResult {
   keyFactors: string[];
 }
 
+export interface BatterSplitEntry {
+  code: string;         // 'h' | 'a' | 'vl' | 'vr'
+  description: string;  // 'Home Games' | 'Away Games' | 'vs Left' | 'vs Right'
+  atBats: number;
+  hits: number;
+  homeRuns: number;
+  rbi: number;
+  strikeouts: number;
+  walks: number;
+  avg: string;
+  obp: string;
+  slg: string;
+  ops: string;
+}
+
 export interface RecentBatterStats {
   games: number;
   atBats: number;

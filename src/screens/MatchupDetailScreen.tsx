@@ -10,9 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
-import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard, StrikeZoneChart, PitchArsenalCard, RecentFormCard } from '../components';
-import { MatchupResult, HotZone, PitchArsenalMatchup, RecentBatterStats, RecentPitcherStats, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
-import { getBatterVsPitcher, getBatterHotZones, getPitchArsenalMatchup, getBatterRecentForm, getPitcherRecentForm } from '../services/mlbApi';
+import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard, StrikeZoneChart, PitchArsenalCard, RecentFormCard, BatterSplitsCard } from '../components';
+import { MatchupResult, HotZone, PitchArsenalMatchup, RecentBatterStats, RecentPitcherStats, BatterSplitEntry, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
+import { getBatterVsPitcher, getBatterHotZones, getPitchArsenalMatchup, getBatterRecentForm, getPitcherRecentForm, getBatterSplits } from '../services/mlbApi';
 
 type MatchupDetailScreenProps = {
   navigation: MatchupDetailScreenNavigationProp;
@@ -42,6 +42,9 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   const [batterForm, setBatterForm] = useState<{ l7: RecentBatterStats; l15: RecentBatterStats; l30: RecentBatterStats } | null>(null);
   const [pitcherForm, setPitcherForm] = useState<{ l3: RecentPitcherStats; l5: RecentPitcherStats; l10: RecentPitcherStats } | null>(null);
   const [formLoading, setFormLoading] = useState(true);
+  const [batterSplits, setBatterSplits] = useState<BatterSplitEntry[]>([]);
+  const [splitsLoading, setSplitsLoading] = useState(true);
+  const [splitsNoData, setSplitsNoData] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,12 +53,13 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       setLoading(true);
       setError(null);
 
-      const [result, zonesResult, arsenalResult, batterFormResult, pitcherFormResult] = await Promise.all([
+      const [result, zonesResult, arsenalResult, batterFormResult, pitcherFormResult, splitsResult] = await Promise.all([
         getBatterVsPitcher(batterId, pitcherId),
         getBatterHotZones(batterId),
         getPitchArsenalMatchup(pitcherId, batterId),
         getBatterRecentForm(batterId),
         getPitcherRecentForm(pitcherId),
+        getBatterSplits(batterId),
       ]);
 
       if (cancelled) return;
@@ -84,6 +88,13 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       if (batterFormResult.success) setBatterForm(batterFormResult.data);
       if (pitcherFormResult.success) setPitcherForm(pitcherFormResult.data);
       setFormLoading(false);
+
+      if (splitsResult.success) {
+        setBatterSplits(splitsResult.data);
+      } else {
+        setSplitsNoData(true);
+      }
+      setSplitsLoading(false);
     };
 
     fetchMatchup();
@@ -259,6 +270,16 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             pitcherForm={pitcherForm}
             batterSeason={matchup.seasonStats}
             loading={formLoading}
+          />
+        </AnimatedCard>
+
+        <AnimatedCard delay={75}>
+          <BatterSplitsCard
+            splits={batterSplits}
+            batterName={matchup.batter.fullName}
+            pitcherHand={matchup.pitcher.pitchHand?.code}
+            loading={splitsLoading}
+            noData={splitsNoData}
           />
         </AnimatedCard>
 

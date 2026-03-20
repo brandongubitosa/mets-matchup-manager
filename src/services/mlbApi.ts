@@ -18,6 +18,7 @@ import {
   PitchArsenalMatchup,
   RecentBatterStats,
   RecentPitcherStats,
+  BatterSplitEntry,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -463,6 +464,57 @@ export const getOpposingPitcherForTeam = async (gameId: number, teamId: number):
 // Legacy: Get opposing starting pitcher for today's game (Mets)
 export const getOpposingPitcher = async (gameId: number): Promise<ApiResult<Player>> => {
   return getOpposingPitcherForTeam(gameId, METS_TEAM_ID);
+};
+
+// ─── Batter Splits ────────────────────────────────────────────────────────────
+
+export const getBatterSplits = async (
+  batterId: number,
+  season?: number
+): Promise<ApiResult<BatterSplitEntry[]>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${batterId}/stats?stats=statSplits&group=hitting&season=${yr}&sitCodes=vl,vr,h,a`
+    );
+
+    const splits: Array<{
+      split?: { code?: string; description?: string };
+      stat?: {
+        atBats?: number; hits?: number; homeRuns?: number; rbi?: number;
+        strikeOuts?: number; baseOnBalls?: number; avg?: string;
+        obp?: string; slg?: string; ops?: string;
+      };
+    }> = response.data?.stats?.[0]?.splits ?? [];
+
+    if (splits.length === 0) {
+      return { success: false, error: 'No split data available' };
+    }
+
+    // Desired display order
+    const ORDER = ['h', 'a', 'vl', 'vr'];
+    const entries: BatterSplitEntry[] = splits
+      .filter((s) => s.split?.code)
+      .sort((a, b) => ORDER.indexOf(a.split!.code!) - ORDER.indexOf(b.split!.code!))
+      .map((s) => ({
+        code: s.split!.code!,
+        description: s.split!.description ?? s.split!.code!,
+        atBats: s.stat?.atBats ?? 0,
+        hits: s.stat?.hits ?? 0,
+        homeRuns: s.stat?.homeRuns ?? 0,
+        rbi: s.stat?.rbi ?? 0,
+        strikeouts: s.stat?.strikeOuts ?? 0,
+        walks: s.stat?.baseOnBalls ?? 0,
+        avg: s.stat?.avg ?? '.000',
+        obp: s.stat?.obp ?? '.000',
+        slg: s.stat?.slg ?? '.000',
+        ops: s.stat?.ops ?? '.000',
+      }));
+
+    return { success: true, data: entries };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
 };
 
 // ─── Recent Form ─────────────────────────────────────────────────────────────
