@@ -11,3 +11,5 @@ export { AnimatedCard } from './AnimatedCard';
 export { SkeletonPlayerCard, SkeletonPlayerList, SkeletonStatsTable, SkeletonGameCard } from './SkeletonLoader';
 export { StepIndicator } from './StepIndicator';
 export { StatBar } from './StatBar';
+export { StrikeZoneChart } from './StrikeZoneChart';
+export { PitchArsenalCard } from './PitchArsenalCard';

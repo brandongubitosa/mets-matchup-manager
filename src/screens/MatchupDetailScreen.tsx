@@ -10,9 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
-import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard } from '../components';
-import { MatchupResult, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
-import { getBatterVsPitcher } from '../services/mlbApi';
+import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard, StrikeZoneChart, PitchArsenalCard } from '../components';
+import { MatchupResult, HotZone, PitchArsenalMatchup, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
+import { getBatterVsPitcher, getBatterHotZones, getPitchArsenalMatchup } from '../services/mlbApi';
 
 type MatchupDetailScreenProps = {
   navigation: MatchupDetailScreenNavigationProp;
@@ -33,6 +33,12 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   const [matchup, setMatchup] = useState<MatchupResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hotZones, setHotZones] = useState<HotZone[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(true);
+  const [zonesNoData, setZonesNoData] = useState(false);
+  const [arsenal, setArsenal] = useState<PitchArsenalMatchup[]>([]);
+  const [arsenalLoading, setArsenalLoading] = useState(true);
+  const [arsenalNoData, setArsenalNoData] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +47,11 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       setLoading(true);
       setError(null);
 
-      const result = await getBatterVsPitcher(batterId, pitcherId);
+      const [result, zonesResult, arsenalResult] = await Promise.all([
+        getBatterVsPitcher(batterId, pitcherId),
+        getBatterHotZones(batterId),
+        getPitchArsenalMatchup(pitcherId, batterId),
+      ]);
 
       if (cancelled) return;
 
@@ -51,6 +61,20 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
         setError(result.error);
       }
       setLoading(false);
+
+      if (zonesResult.success) {
+        setHotZones(zonesResult.data);
+      } else {
+        setZonesNoData(true);
+      }
+      setZonesLoading(false);
+
+      if (arsenalResult.success) {
+        setArsenal(arsenalResult.data);
+      } else {
+        setArsenalNoData(true);
+      }
+      setArsenalLoading(false);
     };
 
     fetchMatchup();
@@ -290,6 +314,16 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           </AnimatedCard>
         )}
 
+        <AnimatedCard delay={300}>
+          <PitchArsenalCard
+            matchups={arsenal}
+            batterName={matchup.batter.fullName}
+            pitcherName={matchup.pitcher.fullName}
+            loading={arsenalLoading}
+            noData={arsenalNoData}
+          />
+        </AnimatedCard>
+
         {stats.atBats > 0 && (
           <AnimatedCard delay={350}>
             <View style={styles.breakdown}>
@@ -315,6 +349,15 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             </View>
           </AnimatedCard>
         )}
+
+        <AnimatedCard delay={450}>
+          <StrikeZoneChart
+            zones={hotZones}
+            batterName={matchup.batter.fullName}
+            loading={zonesLoading}
+            noData={zonesNoData}
+          />
+        </AnimatedCard>
 
         {stats.atBats === 0 && (
           <AnimatedCard delay={200}>

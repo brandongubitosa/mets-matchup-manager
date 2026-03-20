@@ -12,6 +12,10 @@ import {
   BatterPredictionItem,
   TeamPredictionData,
   GamePredictionResult,
+  HotZone,
+  PitcherArsenalPitch,
+  PitchTypeStats,
+  PitchArsenalMatchup,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -457,6 +461,207 @@ export const getOpposingPitcherForTeam = async (gameId: number, teamId: number):
 // Legacy: Get opposing starting pitcher for today's game (Mets)
 export const getOpposingPitcher = async (gameId: number): Promise<ApiResult<Player>> => {
   return getOpposingPitcherForTeam(gameId, METS_TEAM_ID);
+};
+
+// ─── Pitch Arsenal ───────────────────────────────────────────────────────────
+
+// Human-readable pitch names by Statcast code
+const PITCH_NAMES: Record<string, string> = {
+  FF: '4-Seam Fastball',
+  SI: 'Sinker',
+  FT: '2-Seam Fastball',
+  FC: 'Cutter',
+  FS: 'Splitter',
+  SL: 'Slider',
+  ST: 'Sweeper',
+  SV: 'Slurve',
+  CU: 'Curveball',
+  KC: 'Knuckle Curve',
+  CH: 'Changeup',
+  SC: 'Screwball',
+  KN: 'Knuckleball',
+  EP: 'Eephus',
+  FO: 'Forkball',
+  CS: 'Slow Curve',
+};
+
+interface RawArsenalSplit {
+  stat?: {
+    type?: { code?: string; description?: string };
+    percentage?: number;
+    avgSpeed?: number;
+    avgSpin?: number;
+    strikeoutPercent?: number;
+    // batter-side fields
+    atBats?: number;
+    hits?: number;
+    avg?: string;
+    whiffs?: number;
+    swings?: number;
+    whiffPercent?: number;
+  };
+}
+
+export const getPitcherArsenal = async (
+  pitcherId: number,
+  season?: number
+): Promise<ApiResult<PitcherArsenalPitch[]>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${pitcherId}/stats?stats=pitchArsenal&group=pitching&season=${yr}`
+    );
+
+    const splits: RawArsenalSplit[] = response.data?.stats?.[0]?.splits ?? [];
+    if (splits.length === 0) {
+      return { success: false, error: 'No arsenal data available' };
+    }
+
+    const pitches: PitcherArsenalPitch[] = splits
+      .filter((s) => s.stat?.type?.code)
+      .map((s) => {
+        const code = s.stat!.type!.code!;
+        return {
+          pitchCode: code,
+          pitchName: PITCH_NAMES[code] ?? s.stat!.type!.description ?? code,
+          usagePct: s.stat?.percentage ?? 0,
+          avgVelocity: s.stat?.avgSpeed ?? 0,
+          avgSpin: s.stat?.avgSpin,
+          strikeoutPct: s.stat?.strikeoutPercent,
+        };
+      })
+      .filter((p) => p.usagePct > 0)
+      .sort((a, b) => b.usagePct - a.usagePct);
+
+    return { success: true, data: pitches };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+export const getBatterVsPitchType = async (
+  batterId: number,
+  season?: number
+): Promise<ApiResult<PitchTypeStats[]>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${batterId}/stats?stats=pitchArsenal&group=hitting&season=${yr}`
+    );
+
+    const splits: RawArsenalSplit[] = response.data?.stats?.[0]?.splits ?? [];
+    if (splits.length === 0) {
+      return { success: false, error: 'No batter pitch data available' };
+    }
+
+    const stats: PitchTypeStats[] = splits
+      .filter((s) => s.stat?.type?.code)
+      .map((s) => {
+        const code = s.stat!.type!.code!;
+        const atBats = s.stat?.atBats ?? 0;
+        const whiffs = s.stat?.whiffs ?? 0;
+        const swings = s.stat?.swings ?? 0;
+        return {
+          pitchCode: code,
+          pitchType: PITCH_NAMES[code] ?? s.stat!.type!.description ?? code,
+          atBats,
+          hits: s.stat?.hits ?? 0,
+          avg: s.stat?.avg ?? '.000',
+          whiffs,
+          swings,
+          whiffRate:
+            swings > 0
+              ? ((whiffs / swings) * 100).toFixed(0) + '%'
+              : s.stat?.whiffPercent != null
+              ? (s.stat.whiffPercent * 100).toFixed(0) + '%'
+              : '0%',
+        };
+      });
+
+    return { success: true, data: stats };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+export const getPitchArsenalMatchup = async (
+  pitcherId: number,
+  batterId: number,
+  season?: number
+): Promise<ApiResult<PitchArsenalMatchup[]>> => {
+  const [arsenalResult, batterResult] = await Promise.all([
+    getPitcherArsenal(pitcherId, season),
+    getBatterVsPitchType(batterId, season),
+  ]);
+
+  if (!arsenalResult.success) {
+    return { success: false, error: arsenalResult.error };
+  }
+
+  const batterMap: Record<string, PitchTypeStats> = {};
+  if (batterResult.success) {
+    batterResult.data.forEach((s) => {
+      batterMap[s.pitchCode] = s;
+    });
+  }
+
+  const matchups: PitchArsenalMatchup[] = arsenalResult.data.map((pitch) => ({
+    pitcher: pitch,
+    batterStats: batterMap[pitch.pitchCode],
+  }));
+
+  return { success: true, data: matchups };
+};
+
+// ─── Hot Zone (Strike Zone Chart) ───────────────────────────────────────────
+
+export const getBatterHotZones = async (
+  batterId: number,
+  season?: number
+): Promise<ApiResult<HotZone[]>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${batterId}/stats?stats=hotZone&group=hitting&season=${yr}`
+    );
+
+    const splits = response.data?.stats?.[0]?.splits;
+    if (!splits || splits.length === 0) {
+      return { success: false, error: 'No hot zone data available' };
+    }
+
+    // MLB API returns zones nested inside splits[0].stat.zones
+    const zones: Array<{ zone: string; value: string; color?: string; temp?: string }> =
+      splits[0]?.stat?.zones ?? [];
+
+    // Fallback: some API versions return zone as a top-level split property
+    const fallbackZones = splits
+      .filter((s: { zone?: string }) => s.zone)
+      .map((s: { zone: string; stat?: { avg?: string; color?: string; temp?: string } }) => ({
+        zone: s.zone,
+        value: s.stat?.avg ?? '0',
+        color: s.stat?.color,
+        temp: s.stat?.temp,
+      }));
+
+    const result: Array<{ zone: string; value: string; color?: string; temp?: string }> =
+      zones.length > 0 ? zones : fallbackZones;
+    if (result.length === 0) {
+      return { success: false, error: 'No zone data found' };
+    }
+
+    return {
+      success: true,
+      data: result.map((z) => ({
+        zone: z.zone,
+        value: z.value ?? '0',
+        color: z.color,
+        temp: z.temp,
+      })),
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
 };
 
 // ─── Game Prediction ────────────────────────────────────────────────────────

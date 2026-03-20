@@ -38,12 +38,27 @@ export interface MatchupStats {
 
 export interface PitchTypeStats {
   pitchType: string;
+  pitchCode: string;
   atBats: number;
   hits: number;
   avg: string;
   whiffs: number;
   swings: number;
   whiffRate: string;
+}
+
+export interface PitcherArsenalPitch {
+  pitchCode: string;
+  pitchName: string;
+  usagePct: number;   // 0–1
+  avgVelocity: number;
+  avgSpin?: number;
+  strikeoutPct?: number;
+}
+
+export interface PitchArsenalMatchup {
+  pitcher: PitcherArsenalPitch;
+  batterStats?: PitchTypeStats; // undefined if no recorded ABs vs this pitch
 }
 
 export interface MatchupResult {
@@ -194,6 +209,13 @@ export interface GamePredictionResult {
   homeWinProbability: number;
   confidence: number;
   keyFactors: string[];
+}
+
+export interface HotZone {
+  zone: string;
+  value: string; // batting average e.g. ".350"
+  color?: string;
+  temp?: string;
 }
 
 // Custom error class for API errors
