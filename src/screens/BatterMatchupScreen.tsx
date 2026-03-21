@@ -20,11 +20,11 @@ type BatterMatchupScreenProps = {
 };
 
 export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ navigation, route }) => {
-  const { teamId, teamName } = route.params;
+  const { teamId, teamName, opponentTeamId, opponentTeamName } = route.params;
   const [metsBatters, setMetsBatters] = useState<RosterPlayer[]>([]);
   const [opposingPitchers, setOpposingPitchers] = useState<RosterPlayer[]>([]);
   const [selectedBatter, setSelectedBatter] = useState<RosterPlayer | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(opponentTeamId ?? null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingPitchers, setLoadingPitchers] = useState(false);
@@ -79,6 +79,12 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   const filteredPitchers = opposingPitchers.filter((pitcher) =>
     pitcher.fullName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const opponentName = selectedTeamId
+    ? (opponentTeamId === selectedTeamId && opponentTeamName)
+      ? opponentTeamName
+      : MLB_TEAMS[selectedTeamId]?.name ?? MLB_TEAMS[selectedTeamId]?.abbreviation ?? 'Opponent'
+    : null;
 
   const currentStep = !selectedBatter ? 0 : !selectedTeamId ? 1 : 2;
   const steps = [
@@ -147,60 +153,58 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
             excludeTeamId={teamId}
           />
         </>
+      ) : loadingPitchers ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonPlayerList count={4} />
+        </View>
       ) : (
         <>
           <View style={styles.matchupBanner}>
             <Text style={styles.matchupText}>
-              {selectedBatter.fullName} vs. {MLB_TEAMS[selectedTeamId]?.abbreviation}
+              {selectedBatter.fullName} vs. {opponentName ?? MLB_TEAMS[selectedTeamId]?.abbreviation}
             </Text>
             <View style={styles.changeButtons}>
               <TouchableOpacity
                 style={styles.changePill}
-                onPress={() => { setSelectedBatter(null); setSelectedTeamId(null); }}
+                onPress={() => setSelectedBatter(null)}
               >
                 <Text style={styles.changePillText}>Change Batter</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.changePill}
-                onPress={() => setSelectedTeamId(null)}
-              >
-                <Text style={styles.changePillText}>Change Team</Text>
-              </TouchableOpacity>
+              {!opponentTeamId && (
+                <TouchableOpacity
+                  style={styles.changePill}
+                  onPress={() => setSelectedTeamId(null)}
+                >
+                  <Text style={styles.changePillText}>Change Team</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {loadingPitchers ? (
-            <View style={styles.skeletonContainer}>
-              <SkeletonPlayerList count={4} />
-            </View>
-          ) : (
-            <>
-              <SearchBar
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search pitchers..."
-              />
-              <FlatList
-                data={filteredPitchers}
-                keyExtractor={(item) => item.id.toString()}
-                numColumns={2}
-                columnWrapperStyle={styles.cardRow}
-                renderItem={({ item, index }) => (
-                  <AnimatedCard delay={index * 40}>
-                    <PlayerCard
-                      player={item}
-                      variant="card"
-                      onPress={() => handleSelectPitcher(item)}
-                    />
-                  </AnimatedCard>
-                )}
-                contentContainerStyle={styles.cardGrid}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>No pitchers found</Text>
-                }
-              />
-            </>
-          )}
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search pitchers..."
+          />
+          <FlatList
+            data={filteredPitchers}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.cardRow}
+            renderItem={({ item, index }) => (
+              <AnimatedCard delay={index * 40}>
+                <PlayerCard
+                  player={item}
+                  variant="card"
+                  onPress={() => handleSelectPitcher(item)}
+                />
+              </AnimatedCard>
+            )}
+            contentContainerStyle={styles.cardGrid}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No pitchers found</Text>
+            }
+          />
         </>
       )}
     </SafeAreaView>
