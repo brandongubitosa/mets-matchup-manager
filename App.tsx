@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   HomeScreen,
+  LiveScoresScreen,
   BatterMatchupScreen,
   PitcherMatchupScreen,
   MatchupDetailScreen,
@@ -40,6 +41,11 @@ export default function App() {
               name="Home"
               component={HomeScreen}
               options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="LiveScores"
+              component={LiveScoresScreen}
+              options={{ title: 'Live Scores', headerShown: false }}
             />
             <Stack.Screen
               name="BatterMatchup"
