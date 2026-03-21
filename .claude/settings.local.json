@@ -4,18 +4,15 @@
       "Bash(brew upgrade:*)",
       "Bash(npx tsc:*)",
       "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.22.0/bin:$PATH\")",
-      "Bash(node -e *)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(npx vercel:*)",
       "Bash(coderabbit --version)",
       "Bash(coderabbit auth:*)",
-      "Bash(curl -fsSL https://cli.coderabbit.ai/install.sh | sh)",
       "Bash(node node_modules/.bin/tsc --noEmit)",
       "Bash(source ~/.zshrc)",
-      "Bash(vercel --version)",
-      "Bash(node -e \":*)"
+      "Bash(vercel --version)"
     ]
   }
 }
