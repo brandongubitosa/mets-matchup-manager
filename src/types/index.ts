@@ -258,6 +258,32 @@ export interface HotZone {
   temp?: string;
 }
 
+export type GameStatus = 'Preview' | 'Pre-Game' | 'Warmup' | 'In Progress' | 'Final' | 'Game Over' | 'Postponed' | 'Delayed' | 'Suspended';
+
+export interface LiveGame {
+  gamePk: number;
+  gameDate: string;
+  status: {
+    abstractGameState: string;
+    detailedState: GameStatus | string;
+    statusCode: string;
+  };
+  homeTeam: { id: number; name: string };
+  awayTeam: { id: number; name: string };
+  homeScore: number;
+  awayScore: number;
+  homeHits: number;
+  awayHits: number;
+  homeErrors: number;
+  awayErrors: number;
+  currentInning: number | null;
+  currentInningOrdinal: string | null;
+  inningHalf: 'top' | 'bottom' | null;
+  outs: number | null;
+  homeProbablePitcher?: { id: number; fullName: string };
+  awayProbablePitcher?: { id: number; fullName: string };
+}
+
 // Custom error class for API errors
 export class ApiError extends Error {
   constructor(message: string, public readonly originalError?: unknown) {

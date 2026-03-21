@@ -100,10 +100,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <TodaysGameCard
             teamId={selectedTeam.id}
             teamName={selectedTeam.name}
-            onViewMatchups={() =>
+            onViewMatchups={(opponentId: number, opponentName: string) =>
               navigation.navigate('BatterMatchup', {
                 teamId: selectedTeam.id,
                 teamName: selectedTeam.name,
+                opponentTeamId: opponentId,
+                opponentTeamName: opponentName,
               })
             }
             onPredictGame={(game: TodaysGame, opposingPitcher: Player | null) =>
@@ -117,6 +119,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               })
             }
           />
+        </AnimatedCard>
+
+        {/* Live Scores */}
+        <AnimatedCard
+          delay={50}
+          onPress={() =>
+            navigation.navigate('LiveScores', { highlightTeamId: selectedTeam.id })
+          }
+        >
+          <LinearGradient
+            colors={['#0A0A0A', '#1A1A2E']}
+            style={styles.liveScoresCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.liveScoresLeft}>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>LIVE</Text>
+              </View>
+              <Text style={styles.liveScoresTitle}>Scoreboard</Text>
+              <Text style={styles.liveScoresDesc}>All MLB games today</Text>
+            </View>
+            <View style={styles.liveScoresArrow}>
+              <Text style={styles.featureArrowText}>›</Text>
+            </View>
+          </LinearGradient>
         </AnimatedCard>
 
         {/* Section label */}
@@ -393,6 +422,60 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
     marginTop: -2,
+  },
+
+  // ── Live Scores Card ─────────────────────────────────────────────────────
+  liveScoresCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
+  },
+  liveScoresLeft: {
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(239,68,68,0.2)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.danger,
+  },
+  liveBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '800',
+    color: COLORS.danger,
+    letterSpacing: 1,
+  },
+  liveScoresTitle: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: COLORS.white,
+    marginBottom: SPACING.xs,
+  },
+  liveScoresDesc: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  liveScoresArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // ── Footer ───────────────────────────────────────────────────────────────

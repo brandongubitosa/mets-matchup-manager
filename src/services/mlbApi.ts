@@ -19,6 +19,7 @@ import {
   RecentBatterStats,
   RecentPitcherStats,
   BatterSplitEntry,
+  LiveGame,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -864,6 +865,81 @@ export const getBatterHotZones = async (
         temp: z.temp,
       })),
     };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+// ─── Live Scores ─────────────────────────────────────────────────────────────
+
+export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const response = await api.get(
+      `/schedule?sportId=1&date=${today}&hydrate=linescore,team,probablePitcher`
+    );
+
+    const dates = response.data?.dates;
+    if (!dates || dates.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    interface ScheduleGame {
+      gamePk: number;
+      gameDate: string;
+      status: { abstractGameState: string; detailedState: string; statusCode: string };
+      teams: {
+        home: {
+          team: { id: number; name: string };
+          score?: number;
+          probablePitcher?: { id: number; fullName: string };
+        };
+        away: {
+          team: { id: number; name: string };
+          score?: number;
+          probablePitcher?: { id: number; fullName: string };
+        };
+      };
+      linescore?: {
+        currentInning?: number;
+        currentInningOrdinal?: string;
+        isTopInning?: boolean;
+        outs?: number;
+        teams?: {
+          home?: { runs?: number; hits?: number; errors?: number };
+          away?: { runs?: number; hits?: number; errors?: number };
+        };
+      };
+    }
+
+    const games: LiveGame[] = (dates[0].games as ScheduleGame[]).map((g) => {
+      const ls = g.linescore;
+      return {
+        gamePk: g.gamePk,
+        gameDate: g.gameDate,
+        status: g.status,
+        homeTeam: { id: g.teams.home.team.id, name: g.teams.home.team.name },
+        awayTeam: { id: g.teams.away.team.id, name: g.teams.away.team.name },
+        homeScore: ls?.teams?.home?.runs ?? g.teams.home.score ?? 0,
+        awayScore: ls?.teams?.away?.runs ?? g.teams.away.score ?? 0,
+        homeHits: ls?.teams?.home?.hits ?? 0,
+        awayHits: ls?.teams?.away?.hits ?? 0,
+        homeErrors: ls?.teams?.home?.errors ?? 0,
+        awayErrors: ls?.teams?.away?.errors ?? 0,
+        currentInning: ls?.currentInning ?? null,
+        currentInningOrdinal: ls?.currentInningOrdinal ?? null,
+        inningHalf: ls?.isTopInning === true ? 'top' : ls?.isTopInning === false ? 'bottom' : null,
+        outs: ls?.outs ?? null,
+        homeProbablePitcher: g.teams.home.probablePitcher?.id
+          ? { id: g.teams.home.probablePitcher.id, fullName: g.teams.home.probablePitcher.fullName }
+          : undefined,
+        awayProbablePitcher: g.teams.away.probablePitcher?.id
+          ? { id: g.teams.away.probablePitcher.id, fullName: g.teams.away.probablePitcher.fullName }
+          : undefined,
+      };
+    });
+
+    return { success: true, data: games };
   } catch (error) {
     return { success: false, error: formatError(error) };
   }
