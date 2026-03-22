@@ -20,7 +20,14 @@ type BatterMatchupScreenProps = {
 };
 
 export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ navigation, route }) => {
-  const { teamId, teamName, opponentTeamId, opponentTeamName } = route.params;
+  const {
+    teamId,
+    teamName,
+    opponentTeamId,
+    opponentTeamName,
+    pendingBatterId,
+    clearBatter,
+  } = route.params;
   const [metsBatters, setMetsBatters] = useState<RosterPlayer[]>([]);
   const [opposingPitchers, setOpposingPitchers] = useState<RosterPlayer[]>([]);
   const [selectedBatter, setSelectedBatter] = useState<RosterPlayer | null>(null);
@@ -28,6 +35,24 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingPitchers, setLoadingPitchers] = useState(false);
+
+  const flowBase = { teamId, teamName, opponentTeamId, opponentTeamName };
+
+  useEffect(() => {
+    if (clearBatter) {
+      setSelectedBatter(null);
+      navigation.setParams({ clearBatter: undefined });
+    }
+  }, [clearBatter, navigation]);
+
+  useEffect(() => {
+    if (pendingBatterId == null) return;
+    const b = metsBatters.find((p) => p.id === pendingBatterId);
+    if (b) {
+      setSelectedBatter(b);
+      navigation.setParams({ pendingBatterId: undefined });
+    }
+  }, [pendingBatterId, metsBatters, navigation]);
 
   useEffect(() => {
     loadTeamBatters();
@@ -58,18 +83,29 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     setSearchQuery('');
   };
 
-  const handleSelectBatter = (batter: RosterPlayer) => {
-    setSelectedBatter(batter);
+  const opponentName = selectedTeamId
+    ? (opponentTeamId === selectedTeamId && opponentTeamName)
+      ? opponentTeamName
+      : MLB_TEAMS[selectedTeamId]?.name ?? MLB_TEAMS[selectedTeamId]?.abbreviation ?? 'Opponent'
+    : null;
+
+  const openBatterCard = (batter: RosterPlayer) => {
+    navigation.navigate('PlayerBackCard', {
+      playerId: batter.id,
+      backToBatterMatchup: flowBase,
+    });
   };
 
-  const handleSelectPitcher = (pitcher: RosterPlayer) => {
-    if (selectedBatter) {
-      navigation.navigate('MatchupDetail', {
-        batterId: selectedBatter.id,
-        pitcherId: pitcher.id,
-        mode: 'batter',
-      });
-    }
+  const openPitcherCard = (pitcher: RosterPlayer) => {
+    if (!selectedBatter || !selectedTeamId) return;
+    navigation.navigate('PlayerBackCard', {
+      playerId: pitcher.id,
+      counterpartPlayerId: selectedBatter.id,
+      counterpartPlayerName: selectedBatter.fullName,
+      opponentTeamId: selectedTeamId,
+      opponentTeamName: opponentName ?? MLB_TEAMS[selectedTeamId]?.abbreviation ?? 'Opponent',
+      backToBatterMatchup: flowBase,
+    });
   };
 
   const filteredBatters = metsBatters.filter((batter) =>
@@ -79,12 +115,6 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   const filteredPitchers = opposingPitchers.filter((pitcher) =>
     pitcher.fullName.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const opponentName = selectedTeamId
-    ? (opponentTeamId === selectedTeamId && opponentTeamName)
-      ? opponentTeamName
-      : MLB_TEAMS[selectedTeamId]?.name ?? MLB_TEAMS[selectedTeamId]?.abbreviation ?? 'Opponent'
-    : null;
 
   const currentStep = !selectedBatter ? 0 : !selectedTeamId ? 1 : 2;
   const steps = [
@@ -143,9 +173,9 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
               player={selectedBatter}
               variant="list"
               selected
-              onPress={() => setSelectedBatter(null)}
+              onPress={() => openBatterCard(selectedBatter)}
             />
-            <Text style={styles.tapToChange}>Tap player to change</Text>
+            <Text style={styles.tapToChange}>Tap for full card · use card to clear or change</Text>
           </View>
           <TeamPicker
             selectedTeamId={selectedTeamId}
@@ -196,7 +226,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
                 <PlayerCard
                   player={item}
                   variant="card"
-                  onPress={() => handleSelectPitcher(item)}
+                  onPress={() => openPitcherCard(item)}
                 />
               </AnimatedCard>
             )}

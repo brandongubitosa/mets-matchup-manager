@@ -113,36 +113,47 @@ const PitcherStatsCard: React.FC<{
   whip: string;
   strikeouts: number;
   isWinner: boolean;
-}> = ({ label, name, hand, era, whip, strikeouts, isWinner }) => (
-  <View style={[pitcherStyles.card, isWinner && pitcherStyles.winnerCard]}>
-    {isWinner && (
-      <View style={pitcherStyles.winnerBadge}>
-        <Text style={pitcherStyles.winnerBadgeText}>EDGE</Text>
-      </View>
-    )}
-    <Text style={pitcherStyles.label}>{label}</Text>
-    <Text style={pitcherStyles.name} numberOfLines={1}>{name}</Text>
-    {hand && (
-      <View style={pitcherStyles.handBadge}>
-        <Text style={pitcherStyles.handText}>{hand === 'R' ? 'RHP' : 'LHP'}</Text>
-      </View>
-    )}
-    <View style={pitcherStyles.stats}>
-      <View style={pitcherStyles.stat}>
-        <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{era}</Text>
-        <Text style={pitcherStyles.statLabel}>ERA</Text>
-      </View>
-      <View style={pitcherStyles.stat}>
-        <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{whip}</Text>
-        <Text style={pitcherStyles.statLabel}>WHIP</Text>
-      </View>
-      <View style={pitcherStyles.stat}>
-        <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{strikeouts}</Text>
-        <Text style={pitcherStyles.statLabel}>K</Text>
+  onPress?: () => void;
+}> = ({ label, name, hand, era, whip, strikeouts, isWinner, onPress }) => {
+  const inner = (
+    <View style={[pitcherStyles.card, isWinner && pitcherStyles.winnerCard]}>
+      {isWinner && (
+        <View style={pitcherStyles.winnerBadge}>
+          <Text style={pitcherStyles.winnerBadgeText}>EDGE</Text>
+        </View>
+      )}
+      <Text style={pitcherStyles.label}>{label}</Text>
+      <Text style={pitcherStyles.name} numberOfLines={1}>{name}</Text>
+      {hand && (
+        <View style={pitcherStyles.handBadge}>
+          <Text style={pitcherStyles.handText}>{hand === 'R' ? 'RHP' : 'LHP'}</Text>
+        </View>
+      )}
+      <View style={pitcherStyles.stats}>
+        <View style={pitcherStyles.stat}>
+          <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{era}</Text>
+          <Text style={pitcherStyles.statLabel}>ERA</Text>
+        </View>
+        <View style={pitcherStyles.stat}>
+          <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{whip}</Text>
+          <Text style={pitcherStyles.statLabel}>WHIP</Text>
+        </View>
+        <View style={pitcherStyles.stat}>
+          <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{strikeouts}</Text>
+          <Text style={pitcherStyles.statLabel}>K</Text>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+  if (onPress) {
+    return (
+      <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.85} onPress={onPress}>
+        {inner}
+      </TouchableOpacity>
+    );
+  }
+  return inner;
+};
 
 const pitcherStyles = StyleSheet.create({
   card: {
@@ -241,8 +252,17 @@ const platoonLabel = (tag: BatterPredictionItem['platoonAdvantage']): string => 
   }
 };
 
-const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number }> = ({ item, rank }) => (
-  <View style={lineupStyles.row}>
+const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: () => void }> = ({
+  item,
+  rank,
+  onPress,
+}) => (
+  <TouchableOpacity
+    style={lineupStyles.row}
+    onPress={onPress}
+    disabled={!onPress}
+    activeOpacity={0.75}
+  >
     <Text style={lineupStyles.rank}>{rank}</Text>
     <Text style={lineupStyles.name} numberOfLines={1}>{item.fullName}</Text>
     {item.h2hAtBats >= 2 && (
@@ -254,7 +274,7 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number }> = ({ ite
       </Text>
     </View>
     <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
-  </View>
+  </TouchableOpacity>
 );
 
 const lineupStyles = StyleSheet.create({
@@ -425,6 +445,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
   const homePitcherEraNum = parseFloat(homeTeam.pitcherStats?.era ?? '99');
   const awayPitcherEraNum = parseFloat(awayTeam.pitcherStats?.era ?? '99');
   const homePitcherEdge = homePitcherEraNum < awayPitcherEraNum;
+  const gpParams = route.params;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -501,6 +522,17 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                   whip={awayTeam.pitcherStats?.whip ?? '—'}
                   strikeouts={awayTeam.pitcherStats?.strikeouts ?? 0}
                   isWinner={!homePitcherEdge && !!awayTeam.pitcherStats}
+                  onPress={
+                    awayTeam.pitcher
+                      ? () =>
+                          navigation.navigate('PlayerBackCard', {
+                            playerId: awayTeam.pitcher!.id,
+                            opponentTeamId: homeTeam.teamId,
+                            opponentTeamName: homeTeam.teamName,
+                            backToGamePrediction: gpParams,
+                          })
+                      : undefined
+                  }
                 />
                 <PitcherStatsCard
                   label={`${homeAbbr} (Home)`}
@@ -510,6 +542,17 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                   whip={homeTeam.pitcherStats?.whip ?? '—'}
                   strikeouts={homeTeam.pitcherStats?.strikeouts ?? 0}
                   isWinner={homePitcherEdge && !!homeTeam.pitcherStats}
+                  onPress={
+                    homeTeam.pitcher
+                      ? () =>
+                          navigation.navigate('PlayerBackCard', {
+                            playerId: homeTeam.pitcher!.id,
+                            opponentTeamId: awayTeam.teamId,
+                            opponentTeamName: awayTeam.teamName,
+                            backToGamePrediction: gpParams,
+                          })
+                      : undefined
+                  }
                 />
               </View>
             </View>
@@ -552,7 +595,21 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
               </View>
             </View>
             {awayTeam.batters.map((b, i) => (
-              <LineupRow key={b.id} item={b} rank={i + 1} />
+              <LineupRow
+                key={b.id}
+                item={b}
+                rank={i + 1}
+                onPress={() =>
+                  navigation.navigate('PlayerBackCard', {
+                    playerId: b.id,
+                    counterpartPlayerId: homeTeam.pitcher?.id,
+                    counterpartPlayerName: homeTeam.pitcher?.fullName,
+                    opponentTeamId: homeTeam.teamId,
+                    opponentTeamName: homeTeam.teamName,
+                    backToGamePrediction: gpParams,
+                  })
+                }
+              />
             ))}
             <View style={styles.lineupTotal}>
               <Text style={styles.lineupTotalLabel}>Projected Lineup OPS</Text>
@@ -584,7 +641,21 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
               </View>
             </View>
             {homeTeam.batters.map((b, i) => (
-              <LineupRow key={b.id} item={b} rank={i + 1} />
+              <LineupRow
+                key={b.id}
+                item={b}
+                rank={i + 1}
+                onPress={() =>
+                  navigation.navigate('PlayerBackCard', {
+                    playerId: b.id,
+                    counterpartPlayerId: awayTeam.pitcher?.id,
+                    counterpartPlayerName: awayTeam.pitcher?.fullName,
+                    opponentTeamId: awayTeam.teamId,
+                    opponentTeamName: awayTeam.teamName,
+                    backToGamePrediction: gpParams,
+                  })
+                }
+              />
             ))}
             <View style={styles.lineupTotal}>
               <Text style={styles.lineupTotalLabel}>Projected Lineup OPS</Text>

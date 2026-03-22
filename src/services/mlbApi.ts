@@ -954,7 +954,64 @@ const calculatePitcherStats = (stats: Record<string, unknown>): PitcherSeasonSta
   walks: (stats.baseOnBalls as number) ?? 0,
   inningsPitched: (stats.inningsPitched as string) ?? '0.0',
   gamesStarted: (stats.gamesStarted as number) ?? 0,
+  gamesPlayed: typeof stats.gamesPlayed === 'number' ? stats.gamesPlayed : undefined,
+  wins: typeof stats.wins === 'number' ? stats.wins : undefined,
+  losses: typeof stats.losses === 'number' ? stats.losses : undefined,
+  saves: typeof stats.saves === 'number' ? stats.saves : undefined,
 });
+
+const emptyHittingSeason: MatchupStats = {
+  gamesPlayed: 0,
+  atBats: 0,
+  hits: 0,
+  doubles: 0,
+  triples: 0,
+  homeRuns: 0,
+  rbi: 0,
+  walks: 0,
+  strikeouts: 0,
+  avg: '.000',
+  obp: '.000',
+  slg: '.000',
+  ops: '.000',
+};
+
+export const getBatterSeasonStats = async (
+  batterId: number
+): Promise<ApiResult<{ player: Player; stats: MatchupStats }>> => {
+  try {
+    const [playerRes, statsRes] = await Promise.all([
+      api.get<MLBPlayerResponse>(`/people/${batterId}`),
+      api.get<MLBStatsResponse>(`/people/${batterId}/stats?stats=season&group=hitting`),
+    ]);
+
+    const personData = playerRes.data?.people?.[0];
+    if (!personData) {
+      return { success: false, error: 'Player not found' };
+    }
+
+    const raw = statsRes.data?.stats?.[0]?.splits?.[0]?.stat;
+
+    return {
+      success: true,
+      data: {
+        player: {
+          id: personData.id,
+          fullName: personData.fullName,
+          firstName: personData.firstName,
+          lastName: personData.lastName,
+          primaryNumber: personData.primaryNumber,
+          position: personData.primaryPosition,
+          batSide: personData.batSide,
+          pitchHand: personData.pitchHand,
+        },
+        stats: raw ? calculateStats(raw as RawMatchupStats) : emptyHittingSeason,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
 
 export const getPitcherSeasonStats = async (
   pitcherId: number

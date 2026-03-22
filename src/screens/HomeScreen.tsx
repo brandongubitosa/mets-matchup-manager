@@ -118,6 +118,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 opponentPitcherId: opposingPitcher?.id,
               })
             }
+            onProbablePitcherPress={(pitcher, opponentTeamId, opponentTeamName) =>
+              navigation.navigate('PlayerBackCard', {
+                playerId: pitcher.id,
+                opponentTeamId,
+                opponentTeamName,
+              })
+            }
           />
         </AnimatedCard>
 
