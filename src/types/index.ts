@@ -195,6 +195,8 @@ export interface BatterPredictionItem {
   fullName: string;
   batSide?: { code: string; description: string };
   seasonOPS: number;
+  recentOPS?: number;    // last-15-day OPS
+  recentGames?: number;  // games sampled in recent window
   h2hOPS: number;
   h2hAtBats: number;
   effectiveOPS: number;
@@ -206,8 +208,17 @@ export interface TeamPredictionData {
   teamName: string;
   pitcher: Player | null;
   pitcherStats: PitcherSeasonStats | null;
+  pitcherRecentEra?: string; // last-21-day ERA
   batters: BatterPredictionItem[];
   offensiveScore: number;
+}
+
+export interface LiveGameState {
+  homeScore: number;
+  awayScore: number;
+  inning: number;
+  inningHalf: string;
+  preGameProbability: number; // probability before live adjustment
 }
 
 export interface GamePredictionResult {
@@ -217,6 +228,9 @@ export interface GamePredictionResult {
   homeWinProbability: number;
   confidence: number;
   keyFactors: string[];
+  isLive: boolean;
+  liveGameState?: LiveGameState;
+  parkFactor: number;
 }
 
 export interface BatterSplitEntry {

@@ -16,6 +16,7 @@ import {
   GamePredictionScreenRouteProp,
   GamePredictionResult,
   BatterPredictionItem,
+  LiveGameState,
 } from '../types';
 import { predictGame } from '../services/mlbApi';
 
@@ -252,30 +253,47 @@ const platoonLabel = (tag: BatterPredictionItem['platoonAdvantage']): string => 
   }
 };
 
+const formTag = (item: BatterPredictionItem): 'hot' | 'cold' | null => {
+  if (!item.recentOPS || !item.recentGames || item.recentGames < 3) return null;
+  if (item.recentOPS > item.seasonOPS + 0.050) return 'hot';
+  if (item.recentOPS < item.seasonOPS - 0.050) return 'cold';
+  return null;
+};
+
 const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: () => void }> = ({
   item,
   rank,
   onPress,
-}) => (
-  <TouchableOpacity
-    style={lineupStyles.row}
-    onPress={onPress}
-    disabled={!onPress}
-    activeOpacity={0.75}
-  >
-    <Text style={lineupStyles.rank}>{rank}</Text>
-    <Text style={lineupStyles.name} numberOfLines={1}>{item.fullName}</Text>
-    {item.h2hAtBats >= 2 && (
-      <Text style={lineupStyles.h2h}>{item.h2hAtBats} PA</Text>
-    )}
-    <View style={[lineupStyles.platoonBadge, { backgroundColor: `${platoonColor(item.platoonAdvantage)}20` }]}>
-      <Text style={[lineupStyles.platoonText, { color: platoonColor(item.platoonAdvantage) }]}>
-        {platoonLabel(item.platoonAdvantage)}
-      </Text>
-    </View>
-    <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
-  </TouchableOpacity>
-);
+}) => {
+  const form = formTag(item);
+  return (
+    <TouchableOpacity
+      style={lineupStyles.row}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={lineupStyles.rank}>{rank}</Text>
+      <Text style={lineupStyles.name} numberOfLines={1}>{item.fullName}</Text>
+      {form && (
+        <View style={[lineupStyles.formBadge, { backgroundColor: form === 'hot' ? `${COLORS.danger}20` : `${COLORS.primary}15` }]}>
+          <Text style={[lineupStyles.formText, { color: form === 'hot' ? COLORS.danger : COLORS.primary }]}>
+            {form === 'hot' ? '🔥' : '❄️'}
+          </Text>
+        </View>
+      )}
+      {item.h2hAtBats >= 2 && (
+        <Text style={lineupStyles.h2h}>{item.h2hAtBats} PA</Text>
+      )}
+      <View style={[lineupStyles.platoonBadge, { backgroundColor: `${platoonColor(item.platoonAdvantage)}20` }]}>
+        <Text style={[lineupStyles.platoonText, { color: platoonColor(item.platoonAdvantage) }]}>
+          {platoonLabel(item.platoonAdvantage)}
+        </Text>
+      </View>
+      <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
+    </TouchableOpacity>
+  );
+};
 
 const lineupStyles = StyleSheet.create({
   row: {
@@ -312,6 +330,14 @@ const lineupStyles = StyleSheet.create({
   platoonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '800',
+  },
+  formBadge: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 1,
+    borderRadius: RADIUS.full,
+  },
+  formText: {
+    fontSize: 11,
   },
   ops: {
     width: 44,
@@ -358,10 +384,10 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
 
       // Simulate progress steps for UX
       const stepTimer = setTimeout(() => {
-        if (!cancelled) setLoadingStep('Fetching pitcher stats...');
+        if (!cancelled) setLoadingStep('Fetching pitcher stats & recent form...');
       }, 1500);
       const stepTimer2 = setTimeout(() => {
-        if (!cancelled) setLoadingStep('Analyzing matchups...');
+        if (!cancelled) setLoadingStep('Checking live game state...');
       }, 3000);
       const stepTimer3 = setTimeout(() => {
         if (!cancelled) setLoadingStep('Calculating win probability...');
@@ -434,7 +460,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
     );
   }
 
-  const { homeTeam, awayTeam, predictedWinner, homeWinProbability, confidence, keyFactors } = prediction;
+  const { homeTeam, awayTeam, predictedWinner, homeWinProbability, confidence, keyFactors, isLive, liveGameState, parkFactor } = prediction;
   const winner = predictedWinner === 'home' ? homeTeam : awayTeam;
   const winnerAbbr = predictedWinner === 'home' ? homeAbbr : awayAbbr;
   const confidenceLabel =
@@ -471,8 +497,43 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           />
         </LinearGradient>
 
+        {/* Live Game Banner */}
+        {isLive && liveGameState && (
+          <AnimatedCard delay={0}>
+            <View style={styles.liveCard}>
+              <View style={styles.liveBadgeRow}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>GAME IN PROGRESS</Text>
+              </View>
+              <View style={styles.liveScoreRow}>
+                <View style={styles.liveTeamScore}>
+                  <TeamLogo teamId={awayTeamId} size={28} />
+                  <Text style={styles.liveTeamAbbr}>{awayAbbr}</Text>
+                  <Text style={styles.liveScore}>{liveGameState.awayScore}</Text>
+                </View>
+                <View style={styles.liveInningBlock}>
+                  <Text style={styles.liveInningHalf}>
+                    {liveGameState.inningHalf === 'top' ? '▲' : '▼'}
+                  </Text>
+                  <Text style={styles.liveInningNum}>{liveGameState.inning}</Text>
+                </View>
+                <View style={[styles.liveTeamScore, { flexDirection: 'row-reverse' }]}>
+                  <TeamLogo teamId={homeTeamId} size={28} />
+                  <Text style={styles.liveTeamAbbr}>{homeAbbr}</Text>
+                  <Text style={styles.liveScore}>{liveGameState.homeScore}</Text>
+                </View>
+              </View>
+              <Text style={styles.liveNote}>
+                Win probability adjusted for live score (pre-game: {Math.round(
+                  (predictedWinner === 'home' ? liveGameState.preGameProbability : 1 - liveGameState.preGameProbability) * 100
+                )}%)
+              </Text>
+            </View>
+          </AnimatedCard>
+        )}
+
         {/* Predicted Winner */}
-        <AnimatedCard delay={0}>
+        <AnimatedCard delay={isLive ? 80 : 0}>
           <View style={styles.winnerSection}>
             <Text style={styles.winnerLabel}>PREDICTED WINNER</Text>
             <View style={styles.winnerRow}>
@@ -502,7 +563,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
 
             <View style={styles.disclaimer}>
               <Text style={styles.disclaimerText}>
-                Based on lineup OPS, head-to-head history, platoon matchups, and pitcher ERA
+                Based on season OPS, 15-day batter form, H2H history, platoon matchups, pitcher ERA/WHIP/K rate, 3-week pitcher form, park factor ({parkFactor.toFixed(2)}){isLive ? ', and live score' : ''}
               </Text>
             </View>
           </View>
@@ -755,6 +816,76 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '600',
     fontSize: FONT_SIZE.base,
+  },
+
+  // Live game card
+  liveCard: {
+    backgroundColor: '#0A0A0A',
+    margin: SPACING.md,
+    marginBottom: 0,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOW.md,
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: COLORS.danger,
+  },
+  liveBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '800',
+    color: COLORS.danger,
+    letterSpacing: 1.2,
+  },
+  liveScoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  liveTeamScore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  liveTeamAbbr: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  liveScore: {
+    fontSize: FONT_SIZE.xxxl,
+    fontWeight: '900',
+    color: COLORS.white,
+  },
+  liveInningBlock: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+  },
+  liveInningHalf: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    lineHeight: 12,
+  },
+  liveInningNum: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  liveNote: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 
   // Winner section

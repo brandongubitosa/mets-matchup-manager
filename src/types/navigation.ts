@@ -14,6 +14,7 @@ export type GamePredictionRouteParams = {
   opponentTeamId: number;
   opponentTeamName: string;
   isHome: boolean;
+  gameId?: number;
   teamPitcherId?: number;
   opponentPitcherId?: number;
 };
