@@ -1,0 +1,22 @@
+---
+description: Use a dedicated branch for every code change; merge to main for production
+alwaysApply: true
+---
+
+# Git: feature branches
+
+For **any** code or project change (features, fixes, refactors, config that ships):
+
+1. **Do not commit directly on `main`** for new work. Create a new branch first:
+   - `git fetch origin && git checkout main && git pull origin main`
+   - `git checkout -b <type>/<short-description>`  
+   Examples: `fix/todays-game-card`, `feat/live-scores-filter`, `chore/deps`
+
+2. **Implement and commit** on that branch, then push:
+   - `git push -u origin HEAD`
+
+3. **Ship to production** by merging into `main` (PR or local merge) and pushing `main`, since Vercel builds from `main`.
+
+4. **Optional:** After merge, delete the remote feature branch or keep it; align `live-scores` with `main` only if you still use that branch.
+
+Skip branching only for trivial, explicitly local-only edits the user says not to push.
