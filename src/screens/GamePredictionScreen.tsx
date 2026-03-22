@@ -620,6 +620,67 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           </AnimatedCard>
         )}
 
+        {/* Bullpen Comparison */}
+        {(homeTeam.staffStats || awayTeam.staffStats) && (
+          <AnimatedCard delay={150}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bullpen Comparison</Text>
+              <View style={styles.bullpenRow}>
+                {/* Away bullpen */}
+                <View style={styles.bullpenCard}>
+                  <Text style={styles.bullpenTeam}>{awayAbbr}</Text>
+                  {awayTeam.staffStats ? (
+                    <>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>ERA</Text>
+                        <Text style={styles.bullpenStatValue}>{awayTeam.staffStats.era}</Text>
+                      </View>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>WHIP</Text>
+                        <Text style={styles.bullpenStatValue}>{awayTeam.staffStats.whip}</Text>
+                      </View>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>K</Text>
+                        <Text style={styles.bullpenStatValue}>{awayTeam.staffStats.strikeouts}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.bullpenNA}>N/A</Text>
+                  )}
+                </View>
+                <View style={styles.bullpenDivider} />
+                {/* Home bullpen */}
+                <View style={styles.bullpenCard}>
+                  <Text style={styles.bullpenTeam}>{homeAbbr}</Text>
+                  {homeTeam.staffStats ? (
+                    <>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>ERA</Text>
+                        <Text style={[
+                          styles.bullpenStatValue,
+                          parseFloat(homeTeam.staffStats.era) < parseFloat(awayTeam.staffStats?.era ?? '99')
+                            ? styles.bullpenEdge : undefined
+                        ]}>{homeTeam.staffStats.era}</Text>
+                      </View>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>WHIP</Text>
+                        <Text style={styles.bullpenStatValue}>{homeTeam.staffStats.whip}</Text>
+                      </View>
+                      <View style={styles.bullpenStat}>
+                        <Text style={styles.bullpenStatLabel}>K</Text>
+                        <Text style={styles.bullpenStatValue}>{homeTeam.staffStats.strikeouts}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.bullpenNA}>N/A</Text>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.bullpenNote}>Team season pitching stats (starters + relievers)</Text>
+            </View>
+          </AnimatedCard>
+        )}
+
         {/* Key Factors */}
         <AnimatedCard delay={200}>
           <View style={styles.section}>
@@ -1063,5 +1124,63 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT_SIZE.base,
     fontWeight: '700',
+  },
+
+  // Bullpen
+  bullpenRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: SPACING.sm,
+  },
+  bullpenCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  bullpenTeam: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  bullpenStat: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+    alignItems: 'center',
+  },
+  bullpenStatLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+    width: 32,
+    textAlign: 'right',
+  },
+  bullpenStatValue: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    minWidth: 40,
+  },
+  bullpenEdge: {
+    color: COLORS.success,
+  },
+  bullpenDivider: {
+    width: 1,
+    backgroundColor: COLORS.borderLight,
+    marginHorizontal: SPACING.md,
+    alignSelf: 'stretch',
+  },
+  bullpenNA: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  bullpenNote: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    fontStyle: 'italic',
   },
 });

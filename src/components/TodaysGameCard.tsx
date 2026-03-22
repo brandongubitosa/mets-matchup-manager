@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
-import { useTodaysGame, useTeamRoster } from '../hooks';
-import { TodaysGame, Player } from '../types';
+import { useTodaysGame, useTeamRoster, useGameLineup } from '../hooks';
+import { TodaysGame, Player, LineupPlayer } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { SkeletonGameCard } from './SkeletonLoader';
 
@@ -65,6 +65,21 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   const { batters: oppBatters, loading: oppRosterLoading } = useTeamRoster(
     compact ? (game?.opponent?.id ?? 0) : 0
   );
+  const { homeLineup, awayLineup, loading: lineupLoading } = useGameLineup(
+    compact ? game?.gameId : undefined
+  );
+
+  // Determine which lineup side belongs to my team vs opponent
+  const myLineup: LineupPlayer[] = game?.isHome ? homeLineup : awayLineup;
+  const oppLineup: LineupPlayer[] = game?.isHome ? awayLineup : homeLineup;
+
+  // Helper: convert LineupPlayer to display rows, falling back to roster
+  const getLastName = (fullName: string) => {
+    const parts = fullName.trim().split(' ');
+    return parts.length > 1 ? parts.slice(1).join(' ') : fullName;
+  };
+
+  const displayLineupLoading = compact && (myRosterLoading || oppRosterLoading || lineupLoading);
 
   if (loading) {
     return <SkeletonGameCard />;
@@ -207,26 +222,44 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             <Text style={styles.lineupHeaderText}>{opponentAbbr}</Text>
           </View>
 
-          {myRosterLoading || oppRosterLoading ? (
+          {displayLineupLoading ? (
             <View style={styles.lineupLoading}>
               <ActivityIndicator size="small" color={COLORS.textMuted} />
             </View>
           ) : (
             <ScrollView style={styles.lineupScroll} showsVerticalScrollIndicator={false}>
-              {Array.from({ length: Math.max(myBatters.length, oppBatters.length, 1) }).map((_, i) => {
-                const mine = myBatters[i];
-                const opp = oppBatters[i];
+              {Array.from({ length: 9 }).map((_, i) => {
+                // Prefer real lineup; fall back to roster order
+                const myPlayer = myLineup[i];
+                const oppPlayer = oppLineup[i];
+                const myRoster = myBatters[i];
+                const oppRoster = oppBatters[i];
+
+                const myName = myPlayer
+                  ? getLastName(myPlayer.fullName)
+                  : myRoster?.lastName ?? null;
+                const myPos = myPlayer?.position ?? myRoster?.position?.abbreviation ?? null;
+
+                const oppName = oppPlayer
+                  ? getLastName(oppPlayer.fullName)
+                  : oppRoster?.lastName ?? null;
+                const oppPos = oppPlayer?.position ?? oppRoster?.position?.abbreviation ?? null;
+
                 return (
                   <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt]}>
+                    {/* Order number */}
+                    <Text style={styles.lineupOrder}>{i + 1}</Text>
                     {/* My player */}
                     <View style={styles.lineupCell}>
-                      {mine ? (
+                      {myName ? (
                         <>
-                          <View style={styles.posBadge}>
-                            <Text style={styles.posBadgeText}>{mine.position.abbreviation}</Text>
-                          </View>
+                          {myPos ? (
+                            <View style={styles.posBadge}>
+                              <Text style={styles.posBadgeText}>{myPos}</Text>
+                            </View>
+                          ) : null}
                           <Text style={styles.lineupName} numberOfLines={1}>
-                            {mine.lastName}
+                            {myName}
                           </Text>
                         </>
                       ) : null}
@@ -235,14 +268,16 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                     <View style={styles.lineupRowDivider} />
                     {/* Opp player */}
                     <View style={[styles.lineupCell, styles.lineupCellRight]}>
-                      {opp ? (
+                      {oppName ? (
                         <>
                           <Text style={styles.lineupName} numberOfLines={1}>
-                            {opp.lastName}
+                            {oppName}
                           </Text>
-                          <View style={styles.posBadge}>
-                            <Text style={styles.posBadgeText}>{opp.position.abbreviation}</Text>
-                          </View>
+                          {oppPos ? (
+                            <View style={styles.posBadge}>
+                              <Text style={styles.posBadgeText}>{oppPos}</Text>
+                            </View>
+                          ) : null}
                         </>
                       ) : null}
                     </View>
@@ -495,6 +530,14 @@ const styles = StyleSheet.create({
   },
   lineupRowAlt: {
     backgroundColor: COLORS.borderLight,
+  },
+  lineupOrder: {
+    width: 14,
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginRight: 2,
   },
   lineupCell: {
     flex: 1,
