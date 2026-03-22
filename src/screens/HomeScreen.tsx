@@ -9,12 +9,10 @@ import {
   ActivityIndicator,
   TextInput,
   Animated,
-  Image,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
 import { usePersistedTeam } from '../hooks';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
@@ -61,43 +59,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ── Hero Header ── */}
+      {/* ── Compact Horizontal Header ── */}
       <LinearGradient
         colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
         style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
       >
-        {/* Decorative circles */}
-        <View style={styles.decorCircle1} />
-        <View style={styles.decorCircle2} />
-
-        <Animated.View style={[styles.logoWrapper, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}>
-          <TeamLogo teamId={selectedTeam.id} size={88} />
+        <Animated.View style={{ transform: [{ scale: logoScale }], opacity: logoOpacity }}>
+          <TeamLogo teamId={selectedTeam.id} size={40} />
         </Animated.View>
+
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.heroTitle}>{selectedTeam.abbreviation}</Text>
+          <Text style={styles.heroSubtitle}>Matchup Manager</Text>
+        </View>
 
         <TouchableOpacity
           onPress={() => setShowPicker(true)}
-          style={styles.teamSelector}
+          style={styles.changeTeamPill}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Change team"
         >
-          <Text style={styles.heroTitle}>{selectedTeam.abbreviation}</Text>
-          <Text style={styles.heroSubtitle}>Matchup Manager</Text>
-          <View style={styles.changeTeamPill}>
-            <Text style={styles.changeTeamText}>Change Team  ▼</Text>
-          </View>
+          <Text style={styles.changeTeamText}>Change Team ▼</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* ── Content ── */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Today's Game */}
-        <AnimatedCard delay={0}>
+      {/* ── No-Scroll Content Grid ── */}
+      <View style={styles.content}>
+        {/* Today's Game — fills available vertical space */}
+        <AnimatedCard delay={0} style={styles.gameCardWrapper}>
           <TodaysGameCard
+            compact
             teamId={selectedTeam.id}
             teamName={selectedTeam.name}
             onViewMatchups={(opponentId: number, opponentName: string) =>
@@ -128,40 +122,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
         </AnimatedCard>
 
-        {/* Live Scores */}
-        <AnimatedCard
-          delay={50}
-          onPress={() =>
-            navigation.navigate('LiveScores', { highlightTeamId: selectedTeam.id })
-          }
-        >
-          <LinearGradient
-            colors={['#0A0A0A', '#1A1A2E']}
-            style={styles.liveScoresCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+        {/* Quick-action row: Live Scores · Batters · Pitchers */}
+        <View style={styles.quickRow}>
+          {/* Live Scores */}
+          <AnimatedCard
+            delay={60}
+            style={styles.quickBoxWrapper}
+            onPress={() => navigation.navigate('LiveScores', { highlightTeamId: selectedTeam.id })}
           >
-            <View style={styles.liveScoresLeft}>
+            <LinearGradient
+              colors={['#0A0A0A', '#1A1A2E']}
+              style={styles.quickBox}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
               <View style={styles.liveBadge}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveBadgeText}>LIVE</Text>
               </View>
-              <Text style={styles.liveScoresTitle}>Scoreboard</Text>
-              <Text style={styles.liveScoresDesc}>All MLB games today</Text>
-            </View>
-            <View style={styles.liveScoresArrow}>
-              <Text style={styles.featureArrowText}>›</Text>
-            </View>
-          </LinearGradient>
-        </AnimatedCard>
+              <Text style={styles.quickBoxTitle}>Scoreboard</Text>
+              <Text style={styles.quickBoxArrow}>›</Text>
+            </LinearGradient>
+          </AnimatedCard>
 
-        {/* Section label */}
-        <Text style={styles.sectionLabel}>MATCHUP TOOLS</Text>
-
-        {/* 2-column feature cards */}
-        <View style={styles.featureRow}>
+          {/* Batters */}
           <AnimatedCard
-            delay={100}
+            delay={110}
+            style={styles.quickBoxWrapper}
             onPress={() =>
               navigation.navigate('BatterMatchup', {
                 teamId: selectedTeam.id,
@@ -171,23 +158,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <LinearGradient
               colors={[COLORS.primaryDark, COLORS.primary]}
-              style={styles.featureCard}
+              style={styles.quickBox}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <View style={styles.featureIconCircle}>
-                <Text style={styles.featureIcon}>💥</Text>
-              </View>
-              <Text style={styles.featureTitle}>Batters</Text>
-              <Text style={styles.featureDesc}>Hitters vs opposing pitchers</Text>
-              <View style={styles.featureArrow}>
-                <Text style={styles.featureArrowText}>›</Text>
-              </View>
+              <Text style={styles.quickBoxIcon}>💥</Text>
+              <Text style={styles.quickBoxTitle}>Batters</Text>
+              <Text style={styles.quickBoxArrow}>›</Text>
             </LinearGradient>
           </AnimatedCard>
 
+          {/* Pitchers */}
           <AnimatedCard
-            delay={180}
+            delay={160}
+            style={styles.quickBoxWrapper}
             onPress={() =>
               navigation.navigate('PitcherMatchup', {
                 teamId: selectedTeam.id,
@@ -197,25 +181,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <LinearGradient
               colors={[COLORS.secondary, '#A0001F']}
-              style={styles.featureCard}
+              style={styles.quickBox}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <View style={styles.featureIconCircle}>
-                <Text style={styles.featureIcon}>⚾</Text>
-              </View>
-              <Text style={styles.featureTitle}>Pitchers</Text>
-              <Text style={styles.featureDesc}>Starters vs opposing lineups</Text>
-              <View style={styles.featureArrow}>
-                <Text style={styles.featureArrowText}>›</Text>
-              </View>
+              <Text style={styles.quickBoxIcon}>⚾</Text>
+              <Text style={styles.quickBoxTitle}>Pitchers</Text>
+              <Text style={styles.quickBoxArrow}>›</Text>
             </LinearGradient>
           </AnimatedCard>
         </View>
-
-        {/* Footer */}
-        <Text style={styles.footerText}>Data from MLB Stats API</Text>
-      </ScrollView>
+      </View>
 
       {/* ── Team Picker Modal ── */}
       <Modal visible={showPicker} animationType="slide" transparent>
@@ -292,171 +268,99 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Hero Header ──────────────────────────────────────────────────────────
+  // ── Compact Horizontal Header ─────────────────────────────────────────
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xxl,
-    overflow: 'hidden',
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.sm,
   },
-  decorCircle1: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    top: -60,
-    right: -60,
-  },
-  decorCircle2: {
-    position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    bottom: -40,
-    left: -40,
-  },
-  logoWrapper: {
-    marginBottom: SPACING.md,
-    ...SHADOW.lg,
-  },
-  teamSelector: {
-    alignItems: 'center',
+  headerTextGroup: {
+    flex: 1,
   },
   heroTitle: {
-    fontSize: FONT_SIZE.hero,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: '900',
     color: COLORS.white,
-    letterSpacing: 2,
+    letterSpacing: 1,
+    lineHeight: FONT_SIZE.xxl + 2,
   },
   heroSubtitle: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FONT_SIZE.xs,
     color: 'rgba(255,255,255,0.7)',
     fontWeight: '600',
-    letterSpacing: 1,
-    marginTop: 2,
+    letterSpacing: 0.5,
   },
   changeTeamPill: {
-    marginTop: SPACING.md,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
   changeTeamText: {
     color: COLORS.white,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-
-  // ── Scroll Content ──────────────────────────────────────────────────────
-  scrollView: {
-    flex: 1,
-    marginTop: -SPACING.lg,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    paddingTop: SPACING.lg,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xxl,
-  },
-
-  sectionLabel: {
     fontSize: FONT_SIZE.xs,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 
-  // ── Feature Cards (2-col) ───────────────────────────────────────────────
-  featureRow: {
+  // ── No-Scroll Content Grid ────────────────────────────────────────────
+  content: {
+    flex: 1,
+    padding: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  gameCardWrapper: {
+    flex: 1,
+  },
+
+  // ── Quick-Action Row (3 boxes) ────────────────────────────────────────
+  quickRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
   },
-  featureCard: {
+  quickBoxWrapper: {
     flex: 1,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    minHeight: 160,
-    justifyContent: 'space-between',
+  },
+  quickBox: {
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    minHeight: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     overflow: 'hidden',
   },
-  featureIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
+  quickBoxIcon: {
+    fontSize: 20,
   },
-  featureIcon: {
-    fontSize: 24,
-  },
-  featureTitle: {
-    fontSize: FONT_SIZE.xl,
+  quickBoxTitle: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '800',
     color: COLORS.white,
-    marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
-  featureDesc: {
-    fontSize: FONT_SIZE.xs,
-    color: 'rgba(255,255,255,0.7)',
-    lineHeight: 16,
-    flex: 1,
-  },
-  featureArrow: {
-    alignSelf: 'flex-end',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  featureArrowText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZE.xl,
+  quickBoxArrow: {
+    fontSize: FONT_SIZE.lg,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '700',
-    marginTop: -2,
-  },
-
-  // ── Live Scores Card ─────────────────────────────────────────────────────
-  liveScoresCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-  },
-  liveScoresLeft: {
-    flex: 1,
+    lineHeight: FONT_SIZE.lg,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(239,68,68,0.2)',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
+    backgroundColor: 'rgba(239,68,68,0.25)',
+    paddingHorizontal: SPACING.xs + 2,
+    paddingVertical: 2,
     borderRadius: RADIUS.full,
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
+    gap: 3,
   },
   liveDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
     backgroundColor: COLORS.danger,
   },
@@ -464,33 +368,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: '800',
     color: COLORS.danger,
-    letterSpacing: 1,
-  },
-  liveScoresTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '800',
-    color: COLORS.white,
-    marginBottom: SPACING.xs,
-  },
-  liveScoresDesc: {
-    fontSize: FONT_SIZE.xs,
-    color: 'rgba(255,255,255,0.6)',
-  },
-  liveScoresArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Footer ───────────────────────────────────────────────────────────────
-  footerText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: SPACING.xl,
+    letterSpacing: 0.8,
   },
 
   // ── Team Picker Modal ────────────────────────────────────────────────────
