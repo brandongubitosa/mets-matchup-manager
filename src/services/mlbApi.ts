@@ -390,6 +390,7 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
   isHome: boolean;
   opponent: { id: number; name: string };
   probablePitcher?: { id: number; fullName: string };
+  myProbablePitcher?: { id: number; fullName: string };
 }>> => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -406,9 +407,11 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
     const isHome = game.teams.home.team.id === teamId;
     const opponent = isHome ? game.teams.away.team : game.teams.home.team;
 
-    // Extract probable pitcher for the opposing team
+    // Extract probable pitchers for both teams
     const opposingTeamData = isHome ? game.teams.away : game.teams.home;
+    const myTeamData = isHome ? game.teams.home : game.teams.away;
     const probablePitcherData = opposingTeamData?.probablePitcher;
+    const myProbablePitcherData = myTeamData?.probablePitcher;
 
     return {
       success: true,
@@ -430,6 +433,9 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
         },
         probablePitcher: probablePitcherData?.id
           ? { id: probablePitcherData.id, fullName: probablePitcherData.fullName }
+          : undefined,
+        myProbablePitcher: myProbablePitcherData?.id
+          ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName }
           : undefined,
       },
     };

@@ -96,6 +96,10 @@ export interface TodaysGame {
     id: number;
     fullName: string;
   };
+  myProbablePitcher?: {
+    id: number;
+    fullName: string;
+  };
 }
 
 export interface RosterPlayer extends Player {
