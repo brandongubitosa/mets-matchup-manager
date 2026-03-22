@@ -203,6 +203,20 @@ export interface BatterPredictionItem {
   platoonAdvantage: 'advantage' | 'disadvantage' | 'neutral' | 'switch';
 }
 
+export interface LineupPlayer {
+  battingOrder: number; // 1–9
+  playerId: number;
+  fullName: string;
+  position: string; // position abbreviation
+}
+
+export interface TeamStaffStats {
+  era: string;
+  whip: string;
+  strikeouts: number;
+  walks: number;
+}
+
 export interface TeamPredictionData {
   teamId: number;
   teamName: string;
@@ -211,6 +225,7 @@ export interface TeamPredictionData {
   pitcherRecentEra?: string; // last-21-day ERA
   batters: BatterPredictionItem[];
   offensiveScore: number;
+  staffStats?: TeamStaffStats | null;
 }
 
 export interface LiveGameState {

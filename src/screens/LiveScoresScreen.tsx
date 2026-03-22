@@ -330,7 +330,6 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
               isHighlighted={
                 item.homeTeam.id === highlightTeamId || item.awayTeam.id === highlightTeamId
               }
-              highlightTeamId={highlightTeamId}
               onProbablePitcherPress={({ playerId, opponentTeamId, opponentTeamName }) =>
                 navigation.navigate('PlayerBackCard', {
                   playerId,

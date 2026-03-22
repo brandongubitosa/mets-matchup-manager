@@ -20,6 +20,8 @@ import {
   RecentPitcherStats,
   BatterSplitEntry,
   LiveGame,
+  LineupPlayer,
+  TeamStaffStats,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -1293,7 +1295,7 @@ const buildTeamData = async (
   const today   = new Date().toISOString().split('T')[0];
   const start21 = dateNDaysAgo(21);
 
-  const [rosterResult, pitcherResult, pitcherRecentResult] = await Promise.all([
+  const [rosterResult, pitcherResult, pitcherRecentResult, staffResult] = await Promise.all([
     getTeamBatters(teamId),
     pitcherId ? getPitcherSeasonStats(pitcherId) : Promise.resolve(null),
     // Last 21 days (approx 4-5 starts) for pitcher recent ERA
@@ -1302,6 +1304,7 @@ const buildTeamData = async (
           `/people/${pitcherId}/stats?stats=season&group=pitching&startDate=${start21}&endDate=${today}&gameType=R`
         ).catch(() => null)
       : Promise.resolve(null),
+    getTeamPitchingStats(teamId),
   ]);
 
   const batters = rosterResult.slice(0, 9);
@@ -1339,7 +1342,56 @@ const buildTeamData = async (
     pitcherRecentEra,
     batters:           batterItems,
     offensiveScore,
+    staffStats:        staffResult,
   };
+};
+
+const extractLineupFromSide = (players: Record<string, {
+  person: { id: number; fullName: string };
+  position?: { abbreviation: string };
+  battingOrder?: string;
+}>): LineupPlayer[] =>
+  Object.values(players)
+    .filter((p) => p.battingOrder && parseInt(p.battingOrder) % 100 === 0)
+    .sort((a, b) => parseInt(a.battingOrder!) - parseInt(b.battingOrder!))
+    .map((p) => ({
+      battingOrder: parseInt(p.battingOrder!) / 100,
+      playerId: p.person.id,
+      fullName: p.person.fullName,
+      position: p.position?.abbreviation ?? '?',
+    }));
+
+export const getGameLineup = async (
+  gameId: number
+): Promise<{ home: LineupPlayer[]; away: LineupPlayer[] }> => {
+  try {
+    const res = await api.get(`/game/${gameId}/boxscore`);
+    const teams = res.data?.teams;
+    return {
+      home: teams?.home?.players ? extractLineupFromSide(teams.home.players) : [],
+      away: teams?.away?.players ? extractLineupFromSide(teams.away.players) : [],
+    };
+  } catch {
+    return { home: [], away: [] };
+  }
+};
+
+export const getTeamPitchingStats = async (teamId: number): Promise<TeamStaffStats | null> => {
+  try {
+    const res = await api.get(
+      `/teams/${teamId}/stats?stats=season&group=pitching&gameType=R`
+    );
+    const split = res.data?.stats?.[0]?.splits?.[0]?.stat;
+    if (!split) return null;
+    return {
+      era: split.era ?? '0.00',
+      whip: split.whip ?? '0.00',
+      strikeouts: split.strikeOuts ?? 0,
+      walks: split.baseOnBalls ?? 0,
+    };
+  } catch {
+    return null;
+  }
 };
 
 export const predictGame = async (params: {
@@ -1366,12 +1418,27 @@ export const predictGame = async (params: {
     // ── Pitcher quality factors (ERA + WHIP + K/9, blended with recent) ───────
     // In hitter-friendly parks pitcher factors are compressed (more run variance)
     const parkCompression = 1 / Math.sqrt(parkFactor);
-    const rawHomePF = homeData.pitcherStats
+    const rawHomeStarterPF = homeData.pitcherStats
       ? computePitcherFactor(homeData.pitcherStats, homeData.pitcherRecentEra)
       : 1.0;
-    const rawAwayPF = awayData.pitcherStats
+    const rawAwayStarterPF = awayData.pitcherStats
       ? computePitcherFactor(awayData.pitcherStats, awayData.pitcherRecentEra)
       : 1.0;
+
+    // Bullpen factor: invert staff ERA relative to league average (lower ERA → higher factor)
+    const staffFactor = (stats: import('../types').TeamStaffStats | null | undefined) => {
+      if (!stats) return 1.0;
+      const era = parseFloat(stats.era);
+      if (!era || era <= 0) return 1.0;
+      return clamp(LEAGUE_AVG_ERA / era, 0.80, 1.25);
+    };
+    const homeBullpenPF = staffFactor(homeData.staffStats);
+    const awayBullpenPF = staffFactor(awayData.staffStats);
+
+    // Blend: 65% starter, 35% bullpen
+    const rawHomePF = rawHomeStarterPF * 0.65 + homeBullpenPF * 0.35;
+    const rawAwayPF = rawAwayStarterPF * 0.65 + awayBullpenPF * 0.35;
+
     // Compress pitcher factor deviation toward 1.0 based on park
     const homePitcherFactor = 1 + (rawHomePF - 1) * parkCompression;
     const awayPitcherFactor = 1 + (rawAwayPF - 1) * parkCompression;
@@ -1476,6 +1543,21 @@ export const predictGame = async (params: {
       } else if (awayEra < homeEra - 0.5) {
         keyFactors.push(
           `${awayTeamName}'s starter has an ERA edge (${awayData.pitcherStats.era} vs ${homeData.pitcherStats.era})`
+        );
+      }
+    }
+
+    // Bullpen strength comparison
+    if (homeData.staffStats && awayData.staffStats) {
+      const homeStaffEra = parseFloat(homeData.staffStats.era);
+      const awayStaffEra = parseFloat(awayData.staffStats.era);
+      if (homeStaffEra < awayStaffEra - 0.4) {
+        keyFactors.push(
+          `${homeTeamName}'s bullpen has an edge (staff ERA ${homeData.staffStats.era} vs ${awayData.staffStats.era})`
+        );
+      } else if (awayStaffEra < homeStaffEra - 0.4) {
+        keyFactors.push(
+          `${awayTeamName}'s bullpen has an edge (staff ERA ${awayData.staffStats.era} vs ${homeData.staffStats.era})`
         );
       }
     }
