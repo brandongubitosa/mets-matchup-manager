@@ -56,6 +56,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   teamName,
   onViewMatchups,
   onPredictGame,
+  onProbablePitcherPress,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
 
