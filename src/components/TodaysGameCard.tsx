@@ -13,6 +13,7 @@ interface TodaysGameCardProps {
   onViewMatchups?: (opponentId: number, opponentName: string) => void;
   onPredictGame?: (game: TodaysGame, opposingPitcher: Player | null) => void;
   onProbablePitcherPress?: (pitcher: Player, opponentTeamId: number, opponentTeamName: string) => void;
+  compact?: boolean;
 }
 
 const formatGameTime = (isoString: string): string => {
@@ -57,6 +58,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   onViewMatchups,
   onPredictGame,
   onProbablePitcherPress,
+  compact = false,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
 
@@ -66,7 +68,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
 
   if (error || !game) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, compact && styles.containerCompact]}>
         <View style={styles.noGameContent}>
           <Text style={styles.noGameIcon}>📅</Text>
           <Text style={styles.noGameTitle}>No Game Today</Text>
@@ -82,9 +84,10 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   }
 
   const opponentAbbr = MLB_TEAMS[game.opponent.id]?.abbreviation || '???';
+  const logoSize = compact ? 40 : 48;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       <LinearGradient
         colors={[COLORS.primaryDark, COLORS.primary]}
         start={{ x: 0, y: 0 }}
@@ -98,10 +101,10 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         <Text style={styles.gameTime}>{formatGameTime(game.gameTime)}</Text>
       </LinearGradient>
 
-      <View style={styles.matchupRow}>
+      <View style={[styles.matchupRow, compact && styles.matchupRowCompact]}>
         <View style={styles.teamInfo}>
-          <TeamLogo teamId={teamId} size={48} />
-          <Text style={styles.teamAbbr}>
+          <TeamLogo teamId={teamId} size={logoSize} />
+          <Text style={[styles.teamAbbr, compact && styles.teamAbbrCompact]}>
             {MLB_TEAMS[teamId]?.abbreviation || '???'}
           </Text>
           <View style={[styles.homeAwayBadge, game.isHome && styles.homeAwayBadgeActive]}>
@@ -116,8 +119,8 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         </View>
 
         <View style={styles.teamInfo}>
-          <TeamLogo teamId={game.opponent.id} size={48} />
-          <Text style={styles.teamAbbr}>{opponentAbbr}</Text>
+          <TeamLogo teamId={game.opponent.id} size={logoSize} />
+          <Text style={[styles.teamAbbr, compact && styles.teamAbbrCompact]}>{opponentAbbr}</Text>
           <View style={[styles.homeAwayBadge, !game.isHome && styles.homeAwayBadgeActive]}>
             <Text style={[styles.homeAway, !game.isHome && styles.homeAwayActive]}>
               {game.isHome ? 'AWAY' : 'HOME'}
@@ -127,7 +130,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
       </View>
 
       {opposingPitcher && (
-        <View style={styles.pitcherInfo}>
+        <View style={[styles.pitcherInfo, compact && styles.pitcherInfoCompact]}>
           <Text style={styles.pitcherLabel}>Probable Starter  </Text>
           <TouchableOpacity
             onPress={() =>
@@ -151,36 +154,45 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         </View>
       )}
 
-      {onViewMatchups && (
-        <TouchableOpacity
-          style={styles.viewMatchupsButton}
-          onPress={() => onViewMatchups(game.opponent.id, game.opponent.name)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`View matchups against ${game.opponent.name}`}
-        >
-          <LinearGradient
-            colors={[COLORS.secondary, COLORS.secondaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.viewMatchupsGradient}
-          >
-            <Text style={styles.viewMatchupsText}>View Matchups vs {opponentAbbr}</Text>
-            <Text style={styles.viewMatchupsArrow}>›</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
-      {onPredictGame && (
-        <TouchableOpacity
-          style={styles.predictButton}
-          onPress={() => onPredictGame(game, opposingPitcher)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Predict game outcome"
-        >
-          <Text style={styles.predictButtonText}>Predict Game Outcome</Text>
-          <Text style={styles.predictButtonArrow}>›</Text>
-        </TouchableOpacity>
+      {/* Action buttons — side-by-side in compact mode */}
+      {(onViewMatchups || onPredictGame) && (
+        <View style={compact ? styles.buttonsRow : undefined}>
+          {onViewMatchups && (
+            <TouchableOpacity
+              style={[styles.viewMatchupsButton, compact && styles.viewMatchupsButtonCompact]}
+              onPress={() => onViewMatchups(game.opponent.id, game.opponent.name)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`View matchups against ${game.opponent.name}`}
+            >
+              <LinearGradient
+                colors={[COLORS.secondary, COLORS.secondaryLight]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.viewMatchupsGradient}
+              >
+                <Text style={styles.viewMatchupsText}>
+                  {compact ? `vs ${opponentAbbr} Matchups` : `View Matchups vs ${opponentAbbr}`}
+                </Text>
+                <Text style={styles.viewMatchupsArrow}>›</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {onPredictGame && (
+            <TouchableOpacity
+              style={[styles.predictButton, compact && styles.predictButtonCompact]}
+              onPress={() => onPredictGame(game, opposingPitcher)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Predict game outcome"
+            >
+              <Text style={styles.predictButtonText}>
+                {compact ? 'Predict' : 'Predict Game Outcome'}
+              </Text>
+              <Text style={styles.predictButtonArrow}>›</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   );
@@ -193,6 +205,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     overflow: 'hidden',
     ...SHADOW.md,
+  },
+  containerCompact: {
+    flex: 1,
+    marginBottom: 0,
   },
   header: {
     flexDirection: 'row',
@@ -230,6 +246,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.md,
   },
+  matchupRowCompact: {
+    paddingVertical: SPACING.sm,
+  },
   teamInfo: {
     alignItems: 'center',
     flex: 1,
@@ -239,6 +258,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.textPrimary,
     marginTop: SPACING.xs,
+  },
+  teamAbbrCompact: {
+    fontSize: FONT_SIZE.lg,
   },
   homeAwayBadge: {
     marginTop: SPACING.xs,
@@ -280,6 +302,9 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     gap: SPACING.xs,
   },
+  pitcherInfoCompact: {
+    paddingBottom: SPACING.xs,
+  },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
@@ -306,8 +331,16 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '700',
   },
+  buttonsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
   viewMatchupsButton: {
     overflow: 'hidden',
+  },
+  viewMatchupsButtonCompact: {
+    flex: 1,
   },
   viewMatchupsGradient: {
     flexDirection: 'row',
@@ -334,6 +367,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.background,
     gap: SPACING.xs,
+  },
+  predictButtonCompact: {
+    flex: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: COLORS.borderLight,
   },
   predictButtonText: {
     color: COLORS.primary,
