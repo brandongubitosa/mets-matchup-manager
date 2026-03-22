@@ -1054,14 +1054,96 @@ export const getPitcherSeasonStats = async (
   }
 };
 
-const LEAGUE_AVG_OPS = 0.720;
+const LEAGUE_AVG_OPS  = 0.720;
+const LEAGUE_AVG_ERA  = 4.50;
+const LEAGUE_AVG_WHIP = 1.25;
+const LEAGUE_AVG_K9   = 8.5;
+
+// Multi-year park run factors (>1 = hitter-friendly, <1 = pitcher-friendly)
+const PARK_FACTORS: Record<number, number> = {
+  115: 1.12, // COL - Coors Field
+  113: 1.06, // CIN - Great American Ball Park
+  108: 1.05, // LAA - Angel Stadium
+  116: 1.04, // DET - Comerica Park
+  144: 1.04, // ATL - Truist Park
+  111: 1.03, // BOS - Fenway Park
+  142: 1.03, // MIN - Target Field
+  147: 1.02, // NYY - Yankee Stadium
+  112: 1.02, // CHC - Wrigley Field
+  143: 1.01, // PHI - Citizens Bank Park
+  121: 1.01, // NYM - Citi Field
+  118: 1.01, // KC - Kauffman Stadium
+  110: 1.00, // BAL - Camden Yards
+  117: 1.00, // HOU - Minute Maid Park
+  138: 0.99, // STL - Busch Stadium
+  134: 0.99, // PIT - PNC Park
+  114: 0.99, // CLE - Progressive Field
+  158: 0.99, // MIL - American Family Field
+  120: 0.98, // WSH - Nationals Park
+  141: 0.98, // TOR - Rogers Centre
+  133: 0.98, // OAK
+  146: 0.97, // MIA - LoanDepot Park
+  136: 0.97, // SEA - T-Mobile Park
+  145: 0.97, // CWS - Guaranteed Rate Field
+  109: 0.97, // ARI - Chase Field
+  140: 0.97, // TEX - Globe Life Field
+  137: 0.96, // SF - Oracle Park
+  139: 0.96, // TB - Tropicana Field
+  119: 0.96, // LAD - Dodger Stadium
+  135: 0.95, // SD - Petco Park
+};
 
 const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
 
-const pitcherEraFactor = (era: string): number => {
-  const eraNum = parseFloat(era);
-  if (!eraNum || eraNum === 0) return 1.0;
-  return clamp(4.5 / eraNum, 0.6, 1.8);
+// Parse "123.2" IP notation → 123.667 decimal innings
+const parseIPtoDecimal = (ip: string): number => {
+  const parts = (ip ?? '0').toString().split('.');
+  const full   = parseInt(parts[0] ?? '0', 10) || 0;
+  const thirds = parseInt(parts[1] ?? '0', 10) || 0;
+  return full + thirds / 3;
+};
+
+// ISO date string N days ago
+const dateNDaysAgo = (n: number): string =>
+  new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+// Combined pitcher quality factor: ERA (50%) + WHIP (30%) + K/9 (20%)
+// Optionally blended with recent ERA from last few starts (40% weight)
+const computePitcherFactor = (stats: PitcherSeasonStats, recentEra?: string): number => {
+  const era  = parseFloat(stats.era)  || LEAGUE_AVG_ERA;
+  const whip = parseFloat(stats.whip) || LEAGUE_AVG_WHIP;
+  const ip   = parseIPtoDecimal(stats.inningsPitched);
+  const k9   = ip > 0 ? (stats.strikeouts / ip) * 9 : LEAGUE_AVG_K9;
+
+  const eraF  = clamp(LEAGUE_AVG_ERA  / era,  0.6, 1.8);
+  const whipF = clamp(LEAGUE_AVG_WHIP / whip, 0.6, 1.8);
+  const k9F   = clamp(k9 / LEAGUE_AVG_K9,     0.7, 1.35);
+
+  const seasonFactor = 0.50 * eraF + 0.30 * whipF + 0.20 * k9F;
+
+  if (recentEra) {
+    const recentEraNum = parseFloat(recentEra) || LEAGUE_AVG_ERA;
+    const recentEraF   = clamp(LEAGUE_AVG_ERA / recentEraNum, 0.6, 1.8);
+    // 60% full-season composite, 40% recent ERA
+    return 0.60 * seasonFactor + 0.40 * recentEraF;
+  }
+
+  return seasonFactor;
+};
+
+// Sigmoid-based live win expectancy from home team's perspective
+const liveWinExpectancy = (
+  homeScore: number,
+  awayScore: number,
+  inning: number,
+  isTopHalf: boolean,
+): number => {
+  const scoreDiff    = homeScore - awayScore;
+  const inningsLeft  = isTopHalf
+    ? (9 - inning) + 0.5   // still have rest of current + remaining
+    : Math.max(9 - inning, 0.1);
+  const k = 1.8 / Math.max(inningsLeft, 0.2);
+  return clamp(1 / (1 + Math.exp(-k * scoreDiff)), 0.01, 0.99);
 };
 
 const platoonTag = (
@@ -1098,9 +1180,16 @@ const fetchBatterPredictionStats = async (
   opposingPitchHand: string | undefined
 ): Promise<BatterPredictionItem> => {
   try {
+    const today       = new Date().toISOString().split('T')[0];
+    const start15     = dateNDaysAgo(15);
+
     const calls: Promise<unknown>[] = [
       api.get<MLBStatsResponse>(`/people/${batter.id}/stats?stats=season&group=hitting`),
       api.get<MLBPlayerResponse>(`/people/${batter.id}`),
+      // Recent 15-day form
+      api.get<MLBStatsResponse>(
+        `/people/${batter.id}/stats?stats=season&group=hitting&startDate=${start15}&endDate=${today}&gameType=R`
+      ),
     ];
     if (opposingPitcherId) {
       calls.push(
@@ -1110,38 +1199,61 @@ const fetchBatterPredictionStats = async (
       );
     }
 
-    const results = await Promise.all(calls);
+    const results   = await Promise.all(calls);
     const seasonRes = results[0] as { data: MLBStatsResponse };
     const playerRes = results[1] as { data: MLBPlayerResponse };
-    const h2hRes = results[2] as { data: MLBStatsResponse } | undefined;
+    const recentRes = results[2] as { data: MLBStatsResponse };
+    const h2hRes    = results[3] as { data: MLBStatsResponse } | undefined;
 
     const personData = playerRes.data?.people?.[0];
-    const batSide = personData?.batSide;
+    const batSide    = personData?.batSide;
 
+    // Season OPS
     const seasonStat = seasonRes.data?.stats?.[0]?.splits?.[0]?.stat;
     let seasonOPS = LEAGUE_AVG_OPS;
     if (seasonStat) {
       const calc = calculateStats(seasonStat as Parameters<typeof calculateStats>[0]);
-      const ops = parseFloat(calc.ops);
+      const ops  = parseFloat(calc.ops);
       if (ops > 0) seasonOPS = ops;
     }
 
-    let h2hOPS = 0;
+    // Recent 15-day OPS
+    const recentSplit = recentRes.data?.stats?.[0]?.splits?.[0];
+    let recentOPS   = 0;
+    let recentGames = 0;
+    if (recentSplit?.stat) {
+      const calc = calculateStats(recentSplit.stat as Parameters<typeof calculateStats>[0]);
+      const ops  = parseFloat(calc.ops);
+      recentGames = recentSplit.stat.gamesPlayed ?? 0;
+      if (ops > 0 && recentGames >= 3) recentOPS = ops;
+    }
+
+    // H2H OPS
+    let h2hOPS    = 0;
     let h2hAtBats = 0;
     if (h2hRes) {
       const h2hStat = h2hRes.data?.stats?.[0]?.splits?.[0]?.stat;
       if (h2hStat) {
         const calc = calculateStats(h2hStat as Parameters<typeof calculateStats>[0]);
-        h2hAtBats = h2hStat.atBats ?? 0;
+        h2hAtBats  = h2hStat.atBats ?? 0;
         if (h2hAtBats > 0) h2hOPS = parseFloat(calc.ops) || 0;
       }
     }
 
+    // Blend: season + recent form + H2H (weight depends on availability)
     let effectiveOPS = seasonOPS;
-    if (h2hAtBats >= 5) {
-      effectiveOPS = h2hOPS * 0.5 + seasonOPS * 0.5;
+    const hasRecent  = recentOPS > 0 && recentGames >= 3;
+
+    if (h2hAtBats >= 5 && hasRecent) {
+      effectiveOPS = seasonOPS * 0.35 + recentOPS * 0.25 + h2hOPS * 0.40;
+    } else if (h2hAtBats >= 5) {
+      effectiveOPS = seasonOPS * 0.50 + h2hOPS * 0.50;
+    } else if (h2hAtBats >= 2 && hasRecent) {
+      effectiveOPS = seasonOPS * 0.45 + recentOPS * 0.30 + h2hOPS * 0.25;
     } else if (h2hAtBats >= 2) {
-      effectiveOPS = h2hOPS * 0.25 + seasonOPS * 0.75;
+      effectiveOPS = seasonOPS * 0.75 + h2hOPS * 0.25;
+    } else if (hasRecent) {
+      effectiveOPS = seasonOPS * 0.55 + recentOPS * 0.45;
     }
 
     const tag = platoonTag(batSide?.code, opposingPitchHand);
@@ -1152,6 +1264,8 @@ const fetchBatterPredictionStats = async (
       fullName: batter.fullName,
       batSide,
       seasonOPS,
+      recentOPS:   recentOPS > 0 ? recentOPS   : undefined,
+      recentGames: recentGames   ? recentGames  : undefined,
       h2hOPS,
       h2hAtBats,
       effectiveOPS,
@@ -1161,9 +1275,9 @@ const fetchBatterPredictionStats = async (
     return {
       id: batter.id,
       fullName: batter.fullName,
-      seasonOPS: LEAGUE_AVG_OPS,
-      h2hOPS: 0,
-      h2hAtBats: 0,
+      seasonOPS:   LEAGUE_AVG_OPS,
+      h2hOPS:      0,
+      h2hAtBats:   0,
       effectiveOPS: LEAGUE_AVG_OPS,
       platoonAdvantage: 'neutral',
     };
@@ -1176,15 +1290,35 @@ const buildTeamData = async (
   pitcherId: number | undefined,
   opposingPitcherId: number | undefined
 ): Promise<TeamPredictionData> => {
-  const [rosterResult, pitcherResult] = await Promise.all([
+  const today   = new Date().toISOString().split('T')[0];
+  const start21 = dateNDaysAgo(21);
+
+  const [rosterResult, pitcherResult, pitcherRecentResult] = await Promise.all([
     getTeamBatters(teamId),
     pitcherId ? getPitcherSeasonStats(pitcherId) : Promise.resolve(null),
+    // Last 21 days (approx 4-5 starts) for pitcher recent ERA
+    pitcherId
+      ? api.get(
+          `/people/${pitcherId}/stats?stats=season&group=pitching&startDate=${start21}&endDate=${today}&gameType=R`
+        ).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const batters = rosterResult.slice(0, 9);
   const pitcherData = pitcherResult && 'data' in pitcherResult && pitcherResult.success
     ? pitcherResult.data
     : null;
+
+  // Compute recent pitcher ERA from last 21 days
+  let pitcherRecentEra: string | undefined;
+  if (pitcherRecentResult) {
+    try {
+      const resStat = (pitcherRecentResult as { data: { stats?: Array<{ splits?: Array<{ stat?: { era?: string } }> }> } })
+        ?.data?.stats?.[0]?.splits?.[0]?.stat;
+      const era = resStat?.era;
+      if (era && parseFloat(era) > 0) pitcherRecentEra = era;
+    } catch { /* ignore */ }
+  }
 
   const pitchHand = pitcherData?.player?.pitchHand?.code;
 
@@ -1200,9 +1334,10 @@ const buildTeamData = async (
   return {
     teamId,
     teamName,
-    pitcher: pitcherData?.player ?? null,
-    pitcherStats: pitcherData?.stats ?? null,
-    batters: batterItems,
+    pitcher:           pitcherData?.player ?? null,
+    pitcherStats:      pitcherData?.stats ?? null,
+    pitcherRecentEra,
+    batters:           batterItems,
     offensiveScore,
   };
 };
@@ -1218,50 +1353,181 @@ export const predictGame = async (params: {
   try {
     const { homeTeamId, homeTeamName, awayTeamId, awayTeamName, homePitcherId, awayPitcherId } = params;
 
-    const [homeData, awayData] = await Promise.all([
+    // Fetch team data and live scores in parallel
+    const [homeData, awayData, liveScoresResult] = await Promise.all([
       buildTeamData(homeTeamId, homeTeamName, homePitcherId, awayPitcherId),
       buildTeamData(awayTeamId, awayTeamName, awayPitcherId, homePitcherId),
+      getLiveScores().catch(() => ({ success: false as const, error: '' })),
     ]);
 
-    const homePitcherFactor = homeData.pitcherStats ? pitcherEraFactor(homeData.pitcherStats.era) : 1.0;
-    const awayPitcherFactor = awayData.pitcherStats ? pitcherEraFactor(awayData.pitcherStats.era) : 1.0;
+    // ── Park factor (home team's park) ────────────────────────────────────────
+    const parkFactor = PARK_FACTORS[homeTeamId] ?? 1.0;
 
-    const homeRunExp = homeData.offensiveScore * awayPitcherFactor;
-    const awayRunExp = awayData.offensiveScore * homePitcherFactor;
-    const total = homeRunExp + awayRunExp;
+    // ── Pitcher quality factors (ERA + WHIP + K/9, blended with recent) ───────
+    // In hitter-friendly parks pitcher factors are compressed (more run variance)
+    const parkCompression = 1 / Math.sqrt(parkFactor);
+    const rawHomePF = homeData.pitcherStats
+      ? computePitcherFactor(homeData.pitcherStats, homeData.pitcherRecentEra)
+      : 1.0;
+    const rawAwayPF = awayData.pitcherStats
+      ? computePitcherFactor(awayData.pitcherStats, awayData.pitcherRecentEra)
+      : 1.0;
+    // Compress pitcher factor deviation toward 1.0 based on park
+    const homePitcherFactor = 1 + (rawHomePF - 1) * parkCompression;
+    const awayPitcherFactor = 1 + (rawAwayPF - 1) * parkCompression;
+
+    // ── Expected run ratio → base win probability ─────────────────────────────
+    const homeRunExp   = homeData.offensiveScore * parkFactor * awayPitcherFactor;
+    const awayRunExp   = awayData.offensiveScore * parkFactor * homePitcherFactor;
+    const total        = homeRunExp + awayRunExp;
     const baseProbHome = total > 0 ? homeRunExp / total : 0.5;
     // 5% home field advantage
-    const homeWinProbability = clamp(baseProbHome * 0.95 + 0.05, 0.01, 0.99);
-    const predictedWinner: 'home' | 'away' = homeWinProbability >= 0.5 ? 'home' : 'away';
-    const confidence = Math.abs(homeWinProbability - 0.5) * 2;
+    const preGameProb  = clamp(baseProbHome * 0.95 + 0.05, 0.01, 0.99);
 
-    // Build key factors
-    const keyFactors: string[] = [];
+    // ── Live game adjustment ──────────────────────────────────────────────────
+    let finalProb       = preGameProb;
+    let isLive          = false;
+    let liveGameState: import('../types').LiveGameState | undefined;
 
-    const homeAdvCount = homeData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
-    const awayAdvCount = awayData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
-    if (homeAdvCount > awayAdvCount) {
-      keyFactors.push(`${homeTeamName} has ${homeAdvCount} platoon matchup advantages`);
-    } else if (awayAdvCount > homeAdvCount) {
-      keyFactors.push(`${awayTeamName} has ${awayAdvCount} platoon matchup advantages`);
-    }
+    if (liveScoresResult.success) {
+      const liveGame = liveScoresResult.data.find(
+        (g) =>
+          g.status.abstractGameState === 'Live' &&
+          ((g.homeTeam.id === homeTeamId && g.awayTeam.id === awayTeamId) ||
+           (g.homeTeam.id === awayTeamId && g.awayTeam.id === homeTeamId))
+      );
 
-    const homeH2H = homeData.batters.filter((b) => b.h2hAtBats >= 5).length;
-    const awayH2H = awayData.batters.filter((b) => b.h2hAtBats >= 5).length;
-    if (homeH2H + awayH2H > 0) {
-      keyFactors.push(`${homeH2H + awayH2H} batters have significant head-to-head history`);
-    }
+      if (liveGame && liveGame.currentInning) {
+        isLive = true;
+        const inning     = liveGame.currentInning;
+        const isTopHalf  = liveGame.inningHalf === 'top';
 
-    if (homeData.pitcherStats && awayData.pitcherStats) {
-      const homeEra = parseFloat(homeData.pitcherStats.era);
-      const awayEra = parseFloat(awayData.pitcherStats.era);
-      if (homeEra < awayEra - 0.5) {
-        keyFactors.push(`${homeTeamName}'s starter has a significant ERA edge (${homeData.pitcherStats.era} vs ${awayData.pitcherStats.era})`);
-      } else if (awayEra < homeEra - 0.5) {
-        keyFactors.push(`${awayTeamName}'s starter has a significant ERA edge (${awayData.pitcherStats.era} vs ${homeData.pitcherStats.era})`);
+        // Normalise scores so homeTeamId is always the "home" side
+        const liveHomeScore = liveGame.homeTeam.id === homeTeamId
+          ? liveGame.homeScore : liveGame.awayScore;
+        const liveAwayScore = liveGame.homeTeam.id === homeTeamId
+          ? liveGame.awayScore : liveGame.homeScore;
+
+        const liveProb = liveWinExpectancy(liveHomeScore, liveAwayScore, inning, isTopHalf);
+
+        // Weight live data more heavily as game progresses (30% → 85%)
+        const liveWeight   = clamp(0.30 + (inning - 1) * 0.07, 0.30, 0.85);
+        finalProb          = clamp(liveWeight * liveProb + (1 - liveWeight) * preGameProb, 0.01, 0.99);
+
+        liveGameState = {
+          homeScore:          liveHomeScore,
+          awayScore:          liveAwayScore,
+          inning,
+          inningHalf:         liveGame.inningHalf ?? 'top',
+          preGameProbability: preGameProb,
+        };
       }
     }
 
+    const predictedWinner: 'home' | 'away' = finalProb >= 0.5 ? 'home' : 'away';
+    const confidence = Math.abs(finalProb - 0.5) * 2;
+
+    // ── Key factors ───────────────────────────────────────────────────────────
+    const keyFactors: string[] = [];
+
+    // Live game state (highest priority when active)
+    if (isLive && liveGameState) {
+      const { homeScore, awayScore, inning, inningHalf } = liveGameState;
+      const leadTeam = homeScore > awayScore ? homeTeamName
+        : awayScore > homeScore ? awayTeamName
+        : null;
+      const scoreLine = `${awayTeamName} ${awayScore} – ${homeScore} ${homeTeamName}`;
+      if (leadTeam) {
+        keyFactors.push(
+          `LIVE (${inningHalf === 'top' ? 'Top' : 'Bot'} ${inning}): ${scoreLine} — ${leadTeam} leading`
+        );
+      } else {
+        keyFactors.push(`LIVE (${inningHalf === 'top' ? 'Top' : 'Bot'} ${inning}): ${scoreLine} — Tied`);
+      }
+    }
+
+    // Park factor
+    if (parkFactor >= 1.04) {
+      keyFactors.push(
+        `Hitter-friendly park (factor ${parkFactor.toFixed(2)}) — expect elevated run scoring`
+      );
+    } else if (parkFactor <= 0.97) {
+      keyFactors.push(
+        `Pitcher-friendly park (factor ${parkFactor.toFixed(2)}) — pitching edges amplified`
+      );
+    }
+
+    // Pitcher quality edge (ERA + WHIP + K/9 composite)
+    if (homeData.pitcherStats && awayData.pitcherStats) {
+      const homeEra = parseFloat(homeData.pitcherStats.era);
+      const awayEra = parseFloat(awayData.pitcherStats.era);
+      if (rawHomePF > rawAwayPF + 0.08) {
+        keyFactors.push(
+          `${homeTeamName}'s starter has the pitching edge (ERA ${homeData.pitcherStats.era}, WHIP ${homeData.pitcherStats.whip}, ${homeData.pitcherStats.strikeouts} K)`
+        );
+      } else if (rawAwayPF > rawHomePF + 0.08) {
+        keyFactors.push(
+          `${awayTeamName}'s starter has the pitching edge (ERA ${awayData.pitcherStats.era}, WHIP ${awayData.pitcherStats.whip}, ${awayData.pitcherStats.strikeouts} K)`
+        );
+      } else if (homeEra < awayEra - 0.5) {
+        keyFactors.push(
+          `${homeTeamName}'s starter has an ERA edge (${homeData.pitcherStats.era} vs ${awayData.pitcherStats.era})`
+        );
+      } else if (awayEra < homeEra - 0.5) {
+        keyFactors.push(
+          `${awayTeamName}'s starter has an ERA edge (${awayData.pitcherStats.era} vs ${homeData.pitcherStats.era})`
+        );
+      }
+    }
+
+    // Recent pitcher form (if notably better/worse than season ERA)
+    if (homeData.pitcherStats && homeData.pitcherRecentEra) {
+      const seasonEra = parseFloat(homeData.pitcherStats.era);
+      const recentEra = parseFloat(homeData.pitcherRecentEra);
+      if (recentEra < seasonEra - 0.75) {
+        keyFactors.push(`${homeTeamName}'s starter is in recent good form (last 3 wks ERA: ${homeData.pitcherRecentEra})`);
+      } else if (recentEra > seasonEra + 0.75) {
+        keyFactors.push(`${homeTeamName}'s starter has struggled recently (last 3 wks ERA: ${homeData.pitcherRecentEra})`);
+      }
+    }
+    if (awayData.pitcherStats && awayData.pitcherRecentEra) {
+      const seasonEra = parseFloat(awayData.pitcherStats.era);
+      const recentEra = parseFloat(awayData.pitcherRecentEra);
+      if (recentEra < seasonEra - 0.75) {
+        keyFactors.push(`${awayTeamName}'s starter is in recent good form (last 3 wks ERA: ${awayData.pitcherRecentEra})`);
+      } else if (recentEra > seasonEra + 0.75) {
+        keyFactors.push(`${awayTeamName}'s starter has struggled recently (last 3 wks ERA: ${awayData.pitcherRecentEra})`);
+      }
+    }
+
+    // Recent batter form — count batters running hot (recentOPS > seasonOPS + 0.05)
+    const homeHot  = homeData.batters.filter((b) => (b.recentOPS ?? 0) > b.seasonOPS + 0.050).length;
+    const homeCold = homeData.batters.filter((b) => (b.recentOPS ?? 1) < b.seasonOPS - 0.050 && b.recentGames).length;
+    const awayHot  = awayData.batters.filter((b) => (b.recentOPS ?? 0) > b.seasonOPS + 0.050).length;
+    const awayCold = awayData.batters.filter((b) => (b.recentOPS ?? 1) < b.seasonOPS - 0.050 && b.recentGames).length;
+
+    if (homeHot >= 3) keyFactors.push(`${homeTeamName} lineup is running hot — ${homeHot} batters above their season pace (last 15 days)`);
+    if (homeCold >= 3) keyFactors.push(`${homeTeamName} lineup is in a slump — ${homeCold} batters below their season pace (last 15 days)`);
+    if (awayHot >= 3)  keyFactors.push(`${awayTeamName} lineup is running hot — ${awayHot} batters above their season pace (last 15 days)`);
+    if (awayCold >= 3) keyFactors.push(`${awayTeamName} lineup is in a slump — ${awayCold} batters below their season pace (last 15 days)`);
+
+    // Platoon advantages
+    const homeAdvCount = homeData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
+    const awayAdvCount = awayData.batters.filter((b) => b.platoonAdvantage === 'advantage').length;
+    if (homeAdvCount > awayAdvCount + 1) {
+      keyFactors.push(`${homeTeamName} has ${homeAdvCount} platoon matchup advantages vs the opposing starter`);
+    } else if (awayAdvCount > homeAdvCount + 1) {
+      keyFactors.push(`${awayTeamName} has ${awayAdvCount} platoon matchup advantages vs the opposing starter`);
+    }
+
+    // Head-to-head history
+    const homeH2H = homeData.batters.filter((b) => b.h2hAtBats >= 5).length;
+    const awayH2H = awayData.batters.filter((b) => b.h2hAtBats >= 5).length;
+    if (homeH2H + awayH2H > 0) {
+      keyFactors.push(`${homeH2H + awayH2H} batters have significant head-to-head history vs today's starter`);
+    }
+
+    // Lineup strength
     if (homeData.offensiveScore > awayData.offensiveScore + 0.05) {
       keyFactors.push(`${homeTeamName}'s lineup projects stronger against this pitching`);
     } else if (awayData.offensiveScore > homeData.offensiveScore + 0.05) {
@@ -1278,9 +1544,12 @@ export const predictGame = async (params: {
         homeTeam: homeData,
         awayTeam: awayData,
         predictedWinner,
-        homeWinProbability,
+        homeWinProbability: finalProb,
         confidence,
         keyFactors,
+        isLive,
+        liveGameState,
+        parkFactor,
       },
     };
   } catch (error) {

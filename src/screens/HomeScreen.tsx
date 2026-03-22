@@ -109,6 +109,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 opponentTeamId: game.opponent.id,
                 opponentTeamName: game.opponent.name,
                 isHome: game.isHome,
+                gameId: game.gameId,
                 opponentPitcherId: opposingPitcher?.id,
               })
             }
