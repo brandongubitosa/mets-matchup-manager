@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
-import { useTodaysGame } from '../hooks';
+import { useTodaysGame, useTeamRoster } from '../hooks';
 import { TodaysGame, Player } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { SkeletonGameCard } from './SkeletonLoader';
@@ -61,6 +61,10 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   compact = false,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
+  const { batters: myBatters, loading: myRosterLoading } = useTeamRoster(compact ? teamId : 0);
+  const { batters: oppBatters, loading: oppRosterLoading } = useTeamRoster(
+    compact ? (game?.opponent?.id ?? 0) : 0
+  );
 
   if (loading) {
     return <SkeletonGameCard />;
@@ -129,27 +133,123 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         </View>
       </View>
 
-      {opposingPitcher && (
-        <View style={[styles.pitcherInfo, compact && styles.pitcherInfoCompact]}>
-          <Text style={styles.pitcherLabel}>Probable Starter  </Text>
-          <TouchableOpacity
-            onPress={() =>
-              onProbablePitcherPress?.(opposingPitcher, game.opponent.id, game.opponent.name)
-            }
-            disabled={!onProbablePitcherPress}
-            activeOpacity={0.75}
-            style={styles.pitcherNameWrap}
-          >
-            <Text style={styles.pitcherName} numberOfLines={1} ellipsizeMode="tail">
-              {opposingPitcher.fullName}
+      {/* Pitchers row — dual display in compact mode, single in default */}
+      {compact ? (
+        <View style={styles.dualPitcherRow}>
+          {/* My team's pitcher */}
+          <View style={styles.pitcherCol}>
+            <Text style={styles.pitcherColLabel}>
+              {MLB_TEAMS[teamId]?.abbreviation} SP
             </Text>
-          </TouchableOpacity>
-          {opposingPitcher.pitchHand && (
-            <View style={styles.pitcherHandBadge}>
-              <Text style={styles.pitcherHand}>
-                {opposingPitcher.pitchHand.code === 'R' ? 'RHP' : 'LHP'}
+            {game.myProbablePitcher ? (
+              <Text style={styles.pitcherColName} numberOfLines={1} ellipsizeMode="tail">
+                {game.myProbablePitcher.fullName.split(' ').slice(1).join(' ') || game.myProbablePitcher.fullName}
               </Text>
+            ) : (
+              <Text style={styles.pitcherColTBD}>TBD</Text>
+            )}
+          </View>
+          <View style={styles.pitcherColDivider} />
+          {/* Opposing pitcher */}
+          <View style={[styles.pitcherCol, styles.pitcherColRight]}>
+            <Text style={styles.pitcherColLabel}>
+              {opponentAbbr} SP
+            </Text>
+            {opposingPitcher ? (
+              <TouchableOpacity
+                onPress={() => onProbablePitcherPress?.(opposingPitcher, game.opponent.id, game.opponent.name)}
+                disabled={!onProbablePitcherPress}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.pitcherColName, styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
+                  {opposingPitcher.lastName || opposingPitcher.fullName}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.pitcherColTBD}>TBD</Text>
+            )}
+          </View>
+        </View>
+      ) : (
+        opposingPitcher && (
+          <View style={styles.pitcherInfo}>
+            <Text style={styles.pitcherLabel}>Probable Starter  </Text>
+            <TouchableOpacity
+              onPress={() =>
+                onProbablePitcherPress?.(opposingPitcher, game.opponent.id, game.opponent.name)
+              }
+              disabled={!onProbablePitcherPress}
+              activeOpacity={0.75}
+              style={styles.pitcherNameWrap}
+            >
+              <Text style={styles.pitcherName} numberOfLines={1} ellipsizeMode="tail">
+                {opposingPitcher.fullName}
+              </Text>
+            </TouchableOpacity>
+            {opposingPitcher.pitchHand && (
+              <View style={styles.pitcherHandBadge}>
+                <Text style={styles.pitcherHand}>
+                  {opposingPitcher.pitchHand.code === 'R' ? 'RHP' : 'LHP'}
+                </Text>
+              </View>
+            )}
+          </View>
+        )
+      )}
+
+      {/* Lineup section — compact mode only */}
+      {compact && (
+        <View style={styles.lineupSection}>
+          {/* Column headers */}
+          <View style={styles.lineupHeader}>
+            <Text style={styles.lineupHeaderText}>{MLB_TEAMS[teamId]?.abbreviation}</Text>
+            <View style={styles.lineupHeaderDivider} />
+            <Text style={styles.lineupHeaderText}>{opponentAbbr}</Text>
+          </View>
+
+          {myRosterLoading || oppRosterLoading ? (
+            <View style={styles.lineupLoading}>
+              <ActivityIndicator size="small" color={COLORS.textMuted} />
             </View>
+          ) : (
+            <ScrollView style={styles.lineupScroll} showsVerticalScrollIndicator={false}>
+              {Array.from({ length: Math.max(myBatters.length, oppBatters.length, 1) }).map((_, i) => {
+                const mine = myBatters[i];
+                const opp = oppBatters[i];
+                return (
+                  <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt]}>
+                    {/* My player */}
+                    <View style={styles.lineupCell}>
+                      {mine ? (
+                        <>
+                          <View style={styles.posBadge}>
+                            <Text style={styles.posBadgeText}>{mine.position.abbreviation}</Text>
+                          </View>
+                          <Text style={styles.lineupName} numberOfLines={1}>
+                            {mine.lastName}
+                          </Text>
+                        </>
+                      ) : null}
+                    </View>
+                    {/* Center divider */}
+                    <View style={styles.lineupRowDivider} />
+                    {/* Opp player */}
+                    <View style={[styles.lineupCell, styles.lineupCellRight]}>
+                      {opp ? (
+                        <>
+                          <Text style={styles.lineupName} numberOfLines={1}>
+                            {opp.lastName}
+                          </Text>
+                          <View style={styles.posBadge}>
+                            <Text style={styles.posBadgeText}>{opp.position.abbreviation}</Text>
+                          </View>
+                        </>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
           )}
         </View>
       )}
@@ -304,6 +404,130 @@ const styles = StyleSheet.create({
   },
   pitcherInfoCompact: {
     paddingBottom: SPACING.xs,
+  },
+
+  // ── Dual pitcher row (compact) ───────────────────────────────────────────
+  dualPitcherRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  pitcherCol: {
+    flex: 1,
+    paddingVertical: SPACING.xs + 2,
+    paddingHorizontal: SPACING.sm,
+    alignItems: 'flex-start',
+  },
+  pitcherColRight: {
+    alignItems: 'flex-end',
+  },
+  pitcherColDivider: {
+    width: 1,
+    backgroundColor: COLORS.borderLight,
+    marginVertical: SPACING.xs,
+  },
+  pitcherColLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  pitcherColName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  pitcherColNameTappable: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+  },
+  pitcherColTBD: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // ── Lineup section (compact) ─────────────────────────────────────────────
+  lineupSection: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  lineupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.borderLight,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+  },
+  lineupHeaderText: {
+    flex: 1,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  lineupHeaderDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: COLORS.textMuted,
+    opacity: 0.3,
+  },
+  lineupLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+  },
+  lineupScroll: {
+    flex: 1,
+  },
+  lineupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: SPACING.sm,
+  },
+  lineupRowAlt: {
+    backgroundColor: COLORS.borderLight,
+  },
+  lineupCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  lineupCellRight: {
+    justifyContent: 'flex-end',
+  },
+  lineupRowDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: COLORS.borderLight,
+    marginHorizontal: SPACING.xs,
+  },
+  posBadge: {
+    backgroundColor: `${COLORS.primary}12`,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: RADIUS.sm,
+  },
+  posBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.3,
+  },
+  lineupName: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
+    fontWeight: '500',
+    flexShrink: 1,
   },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,
