@@ -116,7 +116,15 @@ const GameStatusBadge: React.FC<{ game: LiveGame }> = ({ game }) => {
   );
 };
 
-const LiveGameCard: React.FC<{ game: LiveGame; isHighlighted: boolean }> = ({ game, isHighlighted }) => {
+const LiveGameCard: React.FC<{
+  game: LiveGame;
+  isHighlighted: boolean;
+  onProbablePitcherPress?: (payload: {
+    playerId: number;
+    opponentTeamId: number;
+    opponentTeamName: string;
+  }) => void;
+}> = ({ game, isHighlighted, onProbablePitcherPress }) => {
   const isLive = game.status.abstractGameState === 'Live';
   const isFinal = game.status.abstractGameState === 'Final';
   const hasStarted = isLive || isFinal;
@@ -147,9 +155,22 @@ const LiveGameCard: React.FC<{ game: LiveGame; isHighlighted: boolean }> = ({ ga
               {awayAbbr}
             </Text>
             {!hasStarted && game.awayProbablePitcher && (
-              <Text style={styles.probablePitcher} numberOfLines={1}>
-                {game.awayProbablePitcher.fullName}
-              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  onProbablePitcherPress?.({
+                    playerId: game.awayProbablePitcher!.id,
+                    opponentTeamId: game.homeTeam.id,
+                    opponentTeamName: game.homeTeam.name,
+                  })
+                }
+                disabled={!onProbablePitcherPress}
+                activeOpacity={0.7}
+                style={styles.probablePitcherHit}
+              >
+                <Text style={styles.probablePitcher} numberOfLines={1}>
+                  {game.awayProbablePitcher.fullName}
+                </Text>
+              </TouchableOpacity>
             )}
             <View style={styles.scoreSpacer} />
             {hasStarted && (
@@ -166,9 +187,22 @@ const LiveGameCard: React.FC<{ game: LiveGame; isHighlighted: boolean }> = ({ ga
               {homeAbbr}
             </Text>
             {!hasStarted && game.homeProbablePitcher && (
-              <Text style={styles.probablePitcher} numberOfLines={1}>
-                {game.homeProbablePitcher.fullName}
-              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  onProbablePitcherPress?.({
+                    playerId: game.homeProbablePitcher!.id,
+                    opponentTeamId: game.awayTeam.id,
+                    opponentTeamName: game.awayTeam.name,
+                  })
+                }
+                disabled={!onProbablePitcherPress}
+                activeOpacity={0.7}
+                style={styles.probablePitcherHit}
+              >
+                <Text style={styles.probablePitcher} numberOfLines={1}>
+                  {game.homeProbablePitcher.fullName}
+                </Text>
+              </TouchableOpacity>
             )}
             <View style={styles.scoreSpacer} />
             {hasStarted && (
@@ -295,6 +329,15 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
               game={item}
               isHighlighted={
                 item.homeTeam.id === highlightTeamId || item.awayTeam.id === highlightTeamId
+              }
+              highlightTeamId={highlightTeamId}
+              onProbablePitcherPress={({ playerId, opponentTeamId, opponentTeamName }) =>
+                navigation.navigate('PlayerBackCard', {
+                  playerId,
+                  opponentTeamId,
+                  opponentTeamName,
+                  backToLiveScores: { highlightTeamId },
+                })
               }
             />
           )}
@@ -573,6 +616,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
     flex: 1,
+  },
+  probablePitcherHit: {
+    flex: 1,
+    minWidth: 0,
   },
   scoreSpacer: {
     flex: 1,

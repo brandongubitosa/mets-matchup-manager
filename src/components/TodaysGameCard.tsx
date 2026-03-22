@@ -12,6 +12,7 @@ interface TodaysGameCardProps {
   teamName: string;
   onViewMatchups?: (opponentId: number, opponentName: string) => void;
   onPredictGame?: (game: TodaysGame, opposingPitcher: Player | null) => void;
+  onProbablePitcherPress?: (pitcher: Player, opponentTeamId: number, opponentTeamName: string) => void;
 }
 
 const formatGameTime = (isoString: string): string => {
@@ -127,9 +128,18 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
       {opposingPitcher && (
         <View style={styles.pitcherInfo}>
           <Text style={styles.pitcherLabel}>Probable Starter  </Text>
-          <Text style={styles.pitcherName} numberOfLines={1} ellipsizeMode="tail">
-            {opposingPitcher.fullName}
-          </Text>
+          <TouchableOpacity
+            onPress={() =>
+              onProbablePitcherPress?.(opposingPitcher, game.opponent.id, game.opponent.name)
+            }
+            disabled={!onProbablePitcherPress}
+            activeOpacity={0.75}
+            style={styles.pitcherNameWrap}
+          >
+            <Text style={styles.pitcherName} numberOfLines={1} ellipsizeMode="tail">
+              {opposingPitcher.fullName}
+            </Text>
+          </TouchableOpacity>
           {opposingPitcher.pitchHand && (
             <View style={styles.pitcherHandBadge}>
               <Text style={styles.pitcherHand}>
@@ -273,6 +283,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
     flexShrink: 0,
+  },
+  pitcherNameWrap: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   pitcherName: {
     fontSize: FONT_SIZE.sm,

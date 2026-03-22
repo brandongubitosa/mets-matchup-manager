@@ -180,6 +180,10 @@ export interface PitcherSeasonStats {
   walks: number;
   inningsPitched: string;
   gamesStarted: number;
+  gamesPlayed?: number;
+  wins?: number;
+  losses?: number;
+  saves?: number;
 }
 
 export interface BatterPredictionItem {

@@ -207,7 +207,18 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           </TouchableOpacity>
 
           <View style={styles.vsContainer}>
-            <View style={styles.playerBox}>
+            <TouchableOpacity
+              style={styles.playerBox}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate('PlayerBackCard', {
+                  playerId: matchup.batter.id,
+                  counterpartPlayerId: matchup.pitcher.id,
+                  counterpartPlayerName: matchup.pitcher.fullName,
+                  backToMatchupDetail: { batterId, pitcherId, mode },
+                })
+              }
+            >
               <View style={styles.headshotContainer}>
                 <Image
                   source={{ uri: getHeadshotUrl(matchup.batter.id) }}
@@ -222,13 +233,24 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
                   {matchup.batter.batSide.code === 'S' ? 'Switch' : `Bats ${matchup.batter.batSide.code}`}
                 </Text>
               )}
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.vsCircle}>
               <Text style={styles.vsText}>VS</Text>
             </View>
 
-            <View style={styles.playerBox}>
+            <TouchableOpacity
+              style={styles.playerBox}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate('PlayerBackCard', {
+                  playerId: matchup.pitcher.id,
+                  counterpartPlayerId: matchup.batter.id,
+                  counterpartPlayerName: matchup.batter.fullName,
+                  backToMatchupDetail: { batterId, pitcherId, mode },
+                })
+              }
+            >
               <View style={styles.headshotContainer}>
                 <Image
                   source={{ uri: getHeadshotUrl(matchup.pitcher.id) }}
@@ -241,7 +263,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
               {matchup.pitcher.pitchHand && (
                 <Text style={styles.playerDetail}>Throws {matchup.pitcher.pitchHand.code}</Text>
               )}
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.badgeRow}>
