@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
 
 interface Step {
   label: string;
@@ -80,6 +80,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
+    ...SHADOW.sm,
+    zIndex: 1,
   },
   stepRow: {
     flexDirection: 'row',

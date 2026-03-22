@@ -96,6 +96,12 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     });
   };
 
+  /** Select batter then open card so Back returns into the flow with this batter chosen */
+  const pickBatterAndOpenCard = (batter: RosterPlayer) => {
+    setSelectedBatter(batter);
+    openBatterCard(batter);
+  };
+
   const openPitcherCard = (pitcher: RosterPlayer) => {
     if (!selectedBatter || !selectedTeamId) return;
     navigation.navigate('PlayerBackCard', {
@@ -159,7 +165,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
                 <PlayerCard
                   player={item}
                   variant="card"
-                  onPress={() => handleSelectBatter(item)}
+                  onPress={() => pickBatterAndOpenCard(item)}
                 />
               </AnimatedCard>
             )}
@@ -175,7 +181,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
               selected
               onPress={() => openBatterCard(selectedBatter)}
             />
-            <Text style={styles.tapToChange}>Tap for full card · use card to clear or change</Text>
+            <Text style={styles.tapToChange}>Tap for stats card · or pick opponent below</Text>
           </View>
           <TeamPicker
             selectedTeamId={selectedTeamId}
@@ -217,10 +223,12 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
             placeholder="Search pitchers..."
           />
           <FlatList
+            style={styles.listFlex}
             data={filteredPitchers}
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard
@@ -245,6 +253,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  listFlex: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: SPACING.md,

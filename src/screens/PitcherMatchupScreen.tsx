@@ -96,6 +96,11 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
     });
   };
 
+  const pickPitcherAndOpenCard = (pitcher: RosterPlayer) => {
+    setSelectedPitcher(pitcher);
+    openPitcherCard(pitcher);
+  };
+
   const openBatterCard = (batter: RosterPlayer) => {
     if (!selectedPitcher || !selectedTeamId) return;
     navigation.navigate('PlayerBackCard', {
@@ -126,7 +131,9 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={[COLORS.primaryDark, COLORS.primary]}
+        colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -150,10 +157,12 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
             placeholder={`Search ${teamName} pitchers...`}
           />
           <FlatList
+            style={styles.listFlex}
             data={filteredPitchers}
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard
@@ -245,6 +254,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  listFlex: {
+    flex: 1,
   },
   header: {
     paddingHorizontal: SPACING.md,

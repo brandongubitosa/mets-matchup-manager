@@ -95,6 +95,12 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
   } = route.params;
 
   const { team: persistedTeam } = usePersistedTeam();
+  /** Prefer the team from the matchup flow (card opened from Batter/Pitcher screens) over storage alone */
+  const flowContextTeam = backToBatterMatchup ?? backToPitcherMatchup;
+  const navTeamId = flowContextTeam?.teamId ?? persistedTeam.id;
+  const navTeamName = flowContextTeam?.teamName ?? persistedTeam.name;
+  const navTeamAbbr = MLB_TEAMS[navTeamId]?.abbreviation ?? persistedTeam.abbreviation;
+
   const [player, setPlayer] = useState<Player | null>(null);
   const [hitting, setHitting] = useState<MatchupStats | null>(null);
   const [pitching, setPitching] = useState<PitcherSeasonStats | null>(null);
@@ -161,10 +167,17 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const oppAbbr = opponentTeamId ? MLB_TEAMS[opponentTeamId]?.abbreviation : null;
+  const canOpenTeamMatchup =
+    !!opponentTeamId && !!opponentTeamName && !!navTeamId && !!navTeamName;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <LinearGradient colors={['#E8B4A8', '#D4A574']} style={styles.topStripe}>
+      <LinearGradient
+        colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.topStripe}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow}>
           <Text style={styles.backText}>&#8249; Back</Text>
         </TouchableOpacity>
@@ -409,7 +422,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.xs,
   },
   backText: {
-    color: COLORS.textPrimary,
+    color: COLORS.white,
     fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
@@ -536,6 +549,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  secondaryBtnHint: {
+    marginTop: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   ghostBtn: {
     paddingVertical: SPACING.sm,
