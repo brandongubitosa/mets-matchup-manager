@@ -96,6 +96,11 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
     });
   };
 
+  const pickPitcherAndOpenCard = (pitcher: RosterPlayer) => {
+    setSelectedPitcher(pitcher);
+    openPitcherCard(pitcher);
+  };
+
   const openBatterCard = (batter: RosterPlayer) => {
     if (!selectedPitcher || !selectedTeamId) return;
     navigation.navigate('PlayerBackCard', {
@@ -159,7 +164,7 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
                 <PlayerCard
                   player={item}
                   variant="card"
-                  onPress={() => handleSelectPitcher(item)}
+                  onPress={() => pickPitcherAndOpenCard(item)}
                 />
               </AnimatedCard>
             )}

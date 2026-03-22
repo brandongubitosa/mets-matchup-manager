@@ -96,6 +96,12 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
     });
   };
 
+  /** Must set selection before navigating so Back returns into the flow with this batter chosen */
+  const pickBatterAndOpenCard = (batter: RosterPlayer) => {
+    setSelectedBatter(batter);
+    openBatterCard(batter);
+  };
+
   const openPitcherCard = (pitcher: RosterPlayer) => {
     if (!selectedBatter || !selectedTeamId) return;
     navigation.navigate('PlayerBackCard', {
@@ -159,7 +165,7 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
                 <PlayerCard
                   player={item}
                   variant="card"
-                  onPress={() => handleSelectBatter(item)}
+                  onPress={() => pickBatterAndOpenCard(item)}
                 />
               </AnimatedCard>
             )}
