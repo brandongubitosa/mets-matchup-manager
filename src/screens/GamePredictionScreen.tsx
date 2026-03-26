@@ -236,6 +236,15 @@ const pitcherStyles = StyleSheet.create({
 });
 
 
+const opsSourceLabel = (item: BatterPredictionItem): string => {
+  const hasH2H = item.h2hAtBats >= 2;
+  const hasRecent = !!item.recentOPS && !!item.recentGames && item.recentGames >= 3;
+  if (hasH2H && hasRecent) return 'H2H Blend';
+  if (hasH2H) return 'H2H+Season';
+  if (hasRecent) return 'L15 Blend';
+  return 'Season';
+};
+
 const formTag = (item: BatterPredictionItem): 'hot' | 'cold' | null => {
   if (!item.recentOPS || !item.recentGames || item.recentGames < 3) return null;
   if (item.recentOPS > item.seasonOPS + 0.050) return 'hot';
@@ -268,7 +277,10 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: 
       <Text style={lineupStyles.h2h}>
         {item.h2hAtBats > 0 ? `${item.h2hAtBats} PA` : '—'}
       </Text>
-      <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
+      <View style={lineupStyles.opsCol}>
+        <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
+        <Text style={lineupStyles.opsLabel}>{opsSourceLabel(item)}</Text>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -308,11 +320,20 @@ const lineupStyles = StyleSheet.create({
   formText: {
     fontSize: 11,
   },
+  opsCol: {
+    alignItems: 'flex-end',
+    width: 56,
+  },
   ops: {
-    width: 44,
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.primary,
+    textAlign: 'right',
+  },
+  opsLabel: {
+    fontSize: 9,
+    color: COLORS.textMuted,
+    fontWeight: '500',
     textAlign: 'right',
   },
 });
@@ -667,7 +688,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
             <View style={styles.lineupHeader}>
               <TeamLogo teamId={awayTeamId} size={24} />
               <Text style={styles.sectionTitle}>{awayAbbr} Lineup</Text>
-              <Text style={styles.lineupOPSHeader}>OPS</Text>
+              <Text style={styles.lineupOPSHeader}>EFF. OPS</Text>
             </View>
             {awayTeam.batters.map((b, i) => (
               <LineupRow
@@ -699,7 +720,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
             <View style={styles.lineupHeader}>
               <TeamLogo teamId={homeTeamId} size={24} />
               <Text style={styles.sectionTitle}>{homeAbbr} Lineup</Text>
-              <Text style={styles.lineupOPSHeader}>OPS</Text>
+              <Text style={styles.lineupOPSHeader}>EFF. OPS</Text>
             </View>
             {homeTeam.batters.map((b, i) => (
               <LineupRow
