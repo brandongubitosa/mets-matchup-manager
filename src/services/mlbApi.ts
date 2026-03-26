@@ -1216,19 +1216,39 @@ const fetchBatterPredictionStats = async (
       if (ops > 0 && recentGames >= 3) recentOPS = ops;
     }
 
-    // H2H — career totals vs this pitcher (same query as getBatterVsPitcher)
+    // H2H — career totals vs this pitcher (sum all season splits from vsPlayerTotal)
     let h2hOPS    = 0;
     let h2hAtBats = 0;
     const h2hSeason: number | undefined = undefined;
     if (opposingPitcherId) {
       const res = await api.get<MLBStatsResponse>(
-        `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting`
+        `/people/${batter.id}/stats?stats=vsPlayerTotal&opposingPlayerId=${opposingPitcherId}&group=hitting`
       ).catch(() => null);
-      const h2hStat = (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits?.[0]?.stat ?? null;
-      if (h2hStat) {
-        const calc = calculateStats(h2hStat as Parameters<typeof calculateStats>[0]);
-        h2hAtBats  = h2hStat.atBats ?? 0;
-        if (h2hAtBats > 0) h2hOPS = parseFloat(calc.ops) || 0;
+      const splits = (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits ?? [];
+
+      // Sum counting stats across all seasonal splits to get career total
+      const combined = splits.reduce((acc, split) => {
+        const s = split.stat;
+        if (!s) return acc;
+        return {
+          atBats:      (acc.atBats      ?? 0) + (s.atBats      ?? 0),
+          hits:        (acc.hits        ?? 0) + (s.hits        ?? 0),
+          doubles:     (acc.doubles     ?? 0) + (s.doubles     ?? 0),
+          triples:     (acc.triples     ?? 0) + (s.triples     ?? 0),
+          homeRuns:    (acc.homeRuns    ?? 0) + (s.homeRuns    ?? 0),
+          rbi:         (acc.rbi         ?? 0) + (s.rbi         ?? 0),
+          baseOnBalls: (acc.baseOnBalls ?? 0) + (s.baseOnBalls ?? 0),
+          hitByPitch:  (acc.hitByPitch  ?? 0) + (s.hitByPitch  ?? 0),
+          sacFlies:    (acc.sacFlies    ?? 0) + (s.sacFlies    ?? 0),
+          strikeOuts:  (acc.strikeOuts  ?? 0) + (s.strikeOuts  ?? 0),
+          gamesPlayed: (acc.gamesPlayed ?? 0) + (s.gamesPlayed ?? 0),
+        };
+      }, {} as Parameters<typeof calculateStats>[0]);
+
+      if ((combined.atBats ?? 0) > 0) {
+        const calc = calculateStats(combined);
+        h2hAtBats = combined.atBats ?? 0;
+        h2hOPS    = parseFloat(calc.ops) || 0;
       }
     }
 
