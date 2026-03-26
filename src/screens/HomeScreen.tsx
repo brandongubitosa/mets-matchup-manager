@@ -120,6 +120,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 opponentTeamName,
               })
             }
+            onPlayerPress={(playerId, opponentTeamId, opponentTeamName) =>
+              navigation.navigate('PlayerBackCard', {
+                playerId,
+                opponentTeamId,
+                opponentTeamName,
+              })
+            }
           />
         </AnimatedCard>
 

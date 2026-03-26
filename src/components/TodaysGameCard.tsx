@@ -13,6 +13,7 @@ interface TodaysGameCardProps {
   onViewMatchups?: (opponentId: number, opponentName: string) => void;
   onPredictGame?: (game: TodaysGame, opposingPitcher: Player | null) => void;
   onProbablePitcherPress?: (pitcher: Player, opponentTeamId: number, opponentTeamName: string) => void;
+  onPlayerPress?: (playerId: number, opponentTeamId: number, opponentTeamName: string) => void;
   compact?: boolean;
 }
 
@@ -58,6 +59,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   onViewMatchups,
   onPredictGame,
   onProbablePitcherPress,
+  onPlayerPress,
   compact = false,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
@@ -157,9 +159,15 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
               {MLB_TEAMS[teamId]?.abbreviation} SP
             </Text>
             {game.myProbablePitcher ? (
-              <Text style={styles.pitcherColName} numberOfLines={1} ellipsizeMode="tail">
-                {game.myProbablePitcher.fullName.split(' ').slice(1).join(' ') || game.myProbablePitcher.fullName}
-              </Text>
+              <TouchableOpacity
+                onPress={() => onPlayerPress?.(game.myProbablePitcher!.id, game.opponent.id, game.opponent.name)}
+                disabled={!onPlayerPress}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
+                  {game.myProbablePitcher.fullName.split(' ').slice(1).join(' ') || game.myProbablePitcher.fullName}
+                </Text>
+              </TouchableOpacity>
             ) : (
               <Text style={styles.pitcherColTBD}>TBD</Text>
             )}
@@ -172,11 +180,11 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             </Text>
             {opposingPitcher ? (
               <TouchableOpacity
-                onPress={() => onProbablePitcherPress?.(opposingPitcher, game.opponent.id, game.opponent.name)}
-                disabled={!onProbablePitcherPress}
+                onPress={() => onPlayerPress?.(opposingPitcher.id, game.opponent.id, game.opponent.name)}
+                disabled={!onPlayerPress}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.pitcherColName, styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
+                <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
                   {opposingPitcher.lastName || opposingPitcher.fullName}
                 </Text>
               </TouchableOpacity>
@@ -245,12 +253,20 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                   : oppRoster?.lastName ?? null;
                 const oppPos = oppPlayer?.position ?? oppRoster?.position?.abbreviation ?? null;
 
+                const myId = myPlayer?.playerId ?? myRoster?.id ?? null;
+                const oppId = oppPlayer?.playerId ?? oppRoster?.id ?? null;
+
                 return (
                   <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt]}>
                     {/* Order number */}
                     <Text style={styles.lineupOrder}>{i + 1}</Text>
                     {/* My player */}
-                    <View style={styles.lineupCell}>
+                    <TouchableOpacity
+                      style={styles.lineupCell}
+                      disabled={!onPlayerPress || !myId}
+                      onPress={() => myId && onPlayerPress?.(myId, game.opponent.id, game.opponent.name)}
+                      activeOpacity={0.7}
+                    >
                       {myName ? (
                         <>
                           {myPos ? (
@@ -263,11 +279,16 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                           </Text>
                         </>
                       ) : null}
-                    </View>
+                    </TouchableOpacity>
                     {/* Center divider */}
                     <View style={styles.lineupRowDivider} />
                     {/* Opp player */}
-                    <View style={[styles.lineupCell, styles.lineupCellRight]}>
+                    <TouchableOpacity
+                      style={[styles.lineupCell, styles.lineupCellRight]}
+                      disabled={!onPlayerPress || !oppId}
+                      onPress={() => oppId && onPlayerPress?.(oppId, game.opponent.id, game.opponent.name)}
+                      activeOpacity={0.7}
+                    >
                       {oppName ? (
                         <>
                           <Text style={styles.lineupName} numberOfLines={1}>
@@ -280,7 +301,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                           ) : null}
                         </>
                       ) : null}
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 );
               })}
