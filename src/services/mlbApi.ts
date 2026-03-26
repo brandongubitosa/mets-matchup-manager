@@ -1185,27 +1185,13 @@ const fetchBatterPredictionStats = async (
     const today       = new Date().toISOString().split('T')[0];
     const start15     = dateNDaysAgo(15);
 
-    const calls: Promise<unknown>[] = [
+    const [seasonRes, playerRes, recentRes] = await Promise.all([
       api.get<MLBStatsResponse>(`/people/${batter.id}/stats?stats=season&group=hitting`),
       api.get<MLBPlayerResponse>(`/people/${batter.id}`),
-      // Recent 15-day form
       api.get<MLBStatsResponse>(
         `/people/${batter.id}/stats?stats=season&group=hitting&startDate=${start15}&endDate=${today}&gameType=R`
       ),
-    ];
-    if (opposingPitcherId) {
-      calls.push(
-        api.get<MLBStatsResponse>(
-          `/people/${batter.id}/stats?stats=vsPlayerTotal&opposingPlayerId=${opposingPitcherId}&group=hitting`
-        )
-      );
-    }
-
-    const results   = await Promise.all(calls);
-    const seasonRes = results[0] as { data: MLBStatsResponse };
-    const playerRes = results[1] as { data: MLBPlayerResponse };
-    const recentRes = results[2] as { data: MLBStatsResponse };
-    const h2hRes    = results[3] as { data: MLBStatsResponse } | undefined;
+    ]) as [{ data: MLBStatsResponse }, { data: MLBPlayerResponse }, { data: MLBStatsResponse }];
 
     const personData = playerRes.data?.people?.[0];
     const batSide    = personData?.batSide;
@@ -1230,11 +1216,24 @@ const fetchBatterPredictionStats = async (
       if (ops > 0 && recentGames >= 3) recentOPS = ops;
     }
 
-    // H2H OPS
+    // H2H OPS — try current season first, fall back to previous season
     let h2hOPS    = 0;
     let h2hAtBats = 0;
-    if (h2hRes) {
-      const h2hStat = h2hRes.data?.stats?.[0]?.splits?.[0]?.stat;
+    if (opposingPitcherId) {
+      const currentYear = new Date().getFullYear();
+      const h2hUrl = (season: number) =>
+        `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting&season=${season}&gameType=R`;
+
+      const tryH2H = async (season: number) => {
+        const res = await api.get<MLBStatsResponse>(h2hUrl(season)).catch(() => null);
+        return (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits?.[0]?.stat ?? null;
+      };
+
+      let h2hStat = await tryH2H(currentYear);
+      if (!h2hStat || (h2hStat.atBats ?? 0) === 0) {
+        h2hStat = await tryH2H(currentYear - 1);
+      }
+
       if (h2hStat) {
         const calc = calculateStats(h2hStat as Parameters<typeof calculateStats>[0]);
         h2hAtBats  = h2hStat.atBats ?? 0;
