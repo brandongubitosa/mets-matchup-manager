@@ -99,6 +99,7 @@ export interface TodaysGame {
   myProbablePitcher?: {
     id: number;
     fullName: string;
+    pitchHand?: string;
   };
 }
 
@@ -199,6 +200,7 @@ export interface BatterPredictionItem {
   recentGames?: number;  // games sampled in recent window
   h2hOPS: number;
   h2hAtBats: number;
+  h2hSeason?: number;
   effectiveOPS: number;
   platoonAdvantage: 'advantage' | 'disadvantage' | 'neutral' | 'switch';
 }
