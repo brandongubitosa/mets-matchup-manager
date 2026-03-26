@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { useTodaysGame, useTeamRoster, useGameLineup } from '../hooks';
@@ -63,6 +63,12 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   compact = false,
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const handleRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
   const { batters: myBatters, loading: myRosterLoading } = useTeamRoster(compact ? teamId : 0);
   const { batters: oppBatters, loading: oppRosterLoading } = useTeamRoster(
     compact ? (game?.opponent?.id ?? 0) : 0
@@ -235,7 +241,13 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
               <ActivityIndicator size="small" color={COLORS.textMuted} />
             </View>
           ) : (
-            <ScrollView style={styles.lineupScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.lineupScroll}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
+              }
+            >
               {Array.from({ length: 9 }).map((_, i) => {
                 // Prefer real lineup; fall back to roster order
                 const myPlayer = myLineup[i];
@@ -247,17 +259,20 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                   ? getLastName(myPlayer.fullName)
                   : myRoster?.lastName ?? null;
                 const myPos = myPlayer?.position ?? myRoster?.position?.abbreviation ?? null;
+                const myHand = myRoster?.batSide?.code ?? null;
 
                 const oppName = oppPlayer
                   ? getLastName(oppPlayer.fullName)
                   : oppRoster?.lastName ?? null;
                 const oppPos = oppPlayer?.position ?? oppRoster?.position?.abbreviation ?? null;
+                const oppHand = oppRoster?.batSide?.code ?? null;
 
                 const myId = myPlayer?.playerId ?? myRoster?.id ?? null;
                 const oppId = oppPlayer?.playerId ?? oppRoster?.id ?? null;
+                const isCleanup = i < 3;
 
                 return (
-                  <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt]}>
+                  <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt, isCleanup && styles.lineupRowCleanup]}>
                     {/* Order number */}
                     <Text style={styles.lineupOrder}>{i + 1}</Text>
                     {/* My player */}
@@ -274,9 +289,12 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                               <Text style={styles.posBadgeText}>{myPos}</Text>
                             </View>
                           ) : null}
-                          <Text style={styles.lineupName} numberOfLines={1}>
+                          <Text style={[styles.lineupName, isCleanup && styles.lineupNameCleanup]} numberOfLines={1}>
                             {myName}
                           </Text>
+                          {myHand ? (
+                            <Text style={styles.handBadge}>{myHand}</Text>
+                          ) : null}
                         </>
                       ) : null}
                     </TouchableOpacity>
@@ -291,7 +309,10 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
                     >
                       {oppName ? (
                         <>
-                          <Text style={styles.lineupName} numberOfLines={1}>
+                          {oppHand ? (
+                            <Text style={styles.handBadge}>{oppHand}</Text>
+                          ) : null}
+                          <Text style={[styles.lineupName, isCleanup && styles.lineupNameCleanup]} numberOfLines={1}>
                             {oppName}
                           </Text>
                           {oppPos ? (
@@ -592,6 +613,19 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  lineupNameCleanup: {
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  lineupRowCleanup: {
+    backgroundColor: `${COLORS.primary}08`,
+  },
+  handBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    opacity: 0.7,
   },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,
