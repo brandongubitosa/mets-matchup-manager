@@ -437,7 +437,7 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
           ? { id: probablePitcherData.id, fullName: probablePitcherData.fullName }
           : undefined,
         myProbablePitcher: myProbablePitcherData?.id
-          ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName }
+          ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName, pitchHand: myProbablePitcherData.pitchHand?.code as string | undefined }
           : undefined,
       },
     };
@@ -1219,6 +1219,7 @@ const fetchBatterPredictionStats = async (
     // H2H OPS — try current season first, fall back to previous season
     let h2hOPS    = 0;
     let h2hAtBats = 0;
+    let h2hSeason: number | undefined;
     if (opposingPitcherId) {
       const currentYear = new Date().getFullYear();
       const h2hUrl = (season: number) =>
@@ -1232,6 +1233,9 @@ const fetchBatterPredictionStats = async (
       let h2hStat = await tryH2H(currentYear);
       if (!h2hStat || (h2hStat.atBats ?? 0) === 0) {
         h2hStat = await tryH2H(currentYear - 1);
+        if (h2hStat && (h2hStat.atBats ?? 0) > 0) h2hSeason = currentYear - 1;
+      } else if ((h2hStat.atBats ?? 0) > 0) {
+        h2hSeason = currentYear;
       }
 
       if (h2hStat) {
@@ -1269,6 +1273,7 @@ const fetchBatterPredictionStats = async (
       recentGames: recentGames   ? recentGames  : undefined,
       h2hOPS,
       h2hAtBats,
+      h2hSeason,
       effectiveOPS,
       platoonAdvantage: tag,
     };

@@ -265,7 +265,11 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: 
           </Text>
         </View>
       )}
-      <Text style={lineupStyles.h2h}>{item.h2hAtBats} PA</Text>
+      <Text style={lineupStyles.h2h}>
+        {item.h2hAtBats > 0
+          ? `${item.h2hAtBats} PA${item.h2hSeason && item.h2hSeason !== new Date().getFullYear() ? ` ('${String(item.h2hSeason).slice(2)})` : ''}`
+          : '—'}
+      </Text>
       <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
     </TouchableOpacity>
   );

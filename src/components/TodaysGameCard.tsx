@@ -165,15 +165,22 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
               {MLB_TEAMS[teamId]?.abbreviation} SP
             </Text>
             {game.myProbablePitcher ? (
-              <TouchableOpacity
-                onPress={() => onPlayerPress?.(game.myProbablePitcher!.id, game.opponent.id, game.opponent.name)}
-                disabled={!onPlayerPress}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
-                  {game.myProbablePitcher.fullName.split(' ').slice(1).join(' ') || game.myProbablePitcher.fullName}
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={() => onPlayerPress?.(game.myProbablePitcher!.id, game.opponent.id, game.opponent.name)}
+                  disabled={!onPlayerPress}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
+                    {game.myProbablePitcher.fullName.split(' ').slice(1).join(' ') || game.myProbablePitcher.fullName}
+                  </Text>
+                </TouchableOpacity>
+                {game.myProbablePitcher.pitchHand && (
+                  <Text style={styles.pitcherHandLabel}>
+                    {game.myProbablePitcher.pitchHand === 'R' ? 'RHP' : 'LHP'}
+                  </Text>
+                )}
+              </>
             ) : (
               <Text style={styles.pitcherColTBD}>TBD</Text>
             )}
@@ -185,15 +192,22 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
               {opponentAbbr} SP
             </Text>
             {opposingPitcher ? (
-              <TouchableOpacity
-                onPress={() => onPlayerPress?.(opposingPitcher.id, game.opponent.id, game.opponent.name)}
-                disabled={!onPlayerPress}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
-                  {opposingPitcher.lastName || opposingPitcher.fullName}
-                </Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={() => onPlayerPress?.(opposingPitcher.id, game.opponent.id, game.opponent.name)}
+                  disabled={!onPlayerPress}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.pitcherColName, onPlayerPress && styles.pitcherColNameTappable]} numberOfLines={1} ellipsizeMode="tail">
+                    {opposingPitcher.lastName || opposingPitcher.fullName}
+                  </Text>
+                </TouchableOpacity>
+                {opposingPitcher.pitchHand?.code && (
+                  <Text style={styles.pitcherHandLabel}>
+                    {opposingPitcher.pitchHand.code === 'R' ? 'RHP' : 'LHP'}
+                  </Text>
+                )}
+              </>
             ) : (
               <Text style={styles.pitcherColTBD}>TBD</Text>
             )}
@@ -526,6 +540,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
     fontStyle: 'italic',
+  },
+  pitcherHandLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
 
   // ── Lineup section (compact) ─────────────────────────────────────────────
