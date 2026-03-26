@@ -435,9 +435,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
     confidence >= 0.2 ? 'Moderate Confidence' :
     'Toss-Up';
 
-  const homePitcherEraNum = parseFloat(homeTeam.pitcherStats?.era ?? '99');
-  const awayPitcherEraNum = parseFloat(awayTeam.pitcherStats?.era ?? '99');
-  const homePitcherEdge = homePitcherEraNum < awayPitcherEraNum;
+  const homePitcherEdge = predictedWinner === 'home';
   const gpParams = route.params;
 
   return (
