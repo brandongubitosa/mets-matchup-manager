@@ -235,23 +235,6 @@ const pitcherStyles = StyleSheet.create({
   },
 });
 
-const platoonColor = (tag: BatterPredictionItem['platoonAdvantage']): string => {
-  switch (tag) {
-    case 'advantage': return COLORS.success;
-    case 'disadvantage': return COLORS.danger;
-    case 'switch': return COLORS.primary;
-    default: return COLORS.gray;
-  }
-};
-
-const platoonLabel = (tag: BatterPredictionItem['platoonAdvantage']): string => {
-  switch (tag) {
-    case 'advantage': return 'ADV';
-    case 'disadvantage': return 'DIS';
-    case 'switch': return 'SW';
-    default: return '—';
-  }
-};
 
 const formTag = (item: BatterPredictionItem): 'hot' | 'cold' | null => {
   if (!item.recentOPS || !item.recentGames || item.recentGames < 3) return null;
@@ -282,14 +265,7 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: 
           </Text>
         </View>
       )}
-      {item.h2hAtBats >= 2 && (
-        <Text style={lineupStyles.h2h}>{item.h2hAtBats} PA</Text>
-      )}
-      <View style={[lineupStyles.platoonBadge, { backgroundColor: `${platoonColor(item.platoonAdvantage)}20` }]}>
-        <Text style={[lineupStyles.platoonText, { color: platoonColor(item.platoonAdvantage) }]}>
-          {platoonLabel(item.platoonAdvantage)}
-        </Text>
-      </View>
+      <Text style={lineupStyles.h2h}>{item.h2hAtBats} PA</Text>
       <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>
     </TouchableOpacity>
   );
@@ -321,15 +297,6 @@ const lineupStyles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
     fontWeight: '500',
-  },
-  platoonBadge: {
-    paddingHorizontal: SPACING.xs + 2,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  platoonText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '800',
   },
   formBadge: {
     paddingHorizontal: SPACING.xs,
@@ -702,20 +669,6 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
               <Text style={styles.sectionTitle}>{awayAbbr} Lineup</Text>
               <Text style={styles.lineupOPSHeader}>OPS</Text>
             </View>
-            <View style={styles.lineupLegend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
-                <Text style={styles.legendText}>Platoon Adv</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
-                <Text style={styles.legendText}>Disadvantage</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-                <Text style={styles.legendText}>Switch</Text>
-              </View>
-            </View>
             {awayTeam.batters.map((b, i) => (
               <LineupRow
                 key={b.id}
@@ -747,20 +700,6 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
               <TeamLogo teamId={homeTeamId} size={24} />
               <Text style={styles.sectionTitle}>{homeAbbr} Lineup</Text>
               <Text style={styles.lineupOPSHeader}>OPS</Text>
-            </View>
-            <View style={styles.lineupLegend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
-                <Text style={styles.legendText}>Platoon Adv</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.danger }]} />
-                <Text style={styles.legendText}>Disadvantage</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-                <Text style={styles.legendText}>Switch</Text>
-              </View>
             </View>
             {homeTeam.batters.map((b, i) => (
               <LineupRow
@@ -1070,26 +1009,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     width: 44,
     textAlign: 'right',
-  },
-  lineupLegend: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.sm,
-    flexWrap: 'wrap',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
   },
   lineupTotal: {
     flexDirection: 'row',
