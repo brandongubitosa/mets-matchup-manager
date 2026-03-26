@@ -1196,7 +1196,7 @@ const fetchBatterPredictionStats = async (
     if (opposingPitcherId) {
       calls.push(
         api.get<MLBStatsResponse>(
-          `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting`
+          `/people/${batter.id}/stats?stats=vsPlayerTotal&opposingPlayerId=${opposingPitcherId}&group=hitting`
         )
       );
     }
