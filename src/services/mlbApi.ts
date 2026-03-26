@@ -1216,28 +1216,15 @@ const fetchBatterPredictionStats = async (
       if (ops > 0 && recentGames >= 3) recentOPS = ops;
     }
 
-    // H2H OPS — try current season first, fall back to previous season
+    // H2H — career totals vs this pitcher (same query as getBatterVsPitcher)
     let h2hOPS    = 0;
     let h2hAtBats = 0;
-    let h2hSeason: number | undefined;
+    const h2hSeason: number | undefined = undefined;
     if (opposingPitcherId) {
-      const currentYear = new Date().getFullYear();
-      const h2hUrl = (season: number) =>
-        `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting&season=${season}&gameType=R`;
-
-      const tryH2H = async (season: number) => {
-        const res = await api.get<MLBStatsResponse>(h2hUrl(season)).catch(() => null);
-        return (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits?.[0]?.stat ?? null;
-      };
-
-      let h2hStat = await tryH2H(currentYear);
-      if (!h2hStat || (h2hStat.atBats ?? 0) === 0) {
-        h2hStat = await tryH2H(currentYear - 1);
-        if (h2hStat && (h2hStat.atBats ?? 0) > 0) h2hSeason = currentYear - 1;
-      } else if ((h2hStat.atBats ?? 0) > 0) {
-        h2hSeason = currentYear;
-      }
-
+      const res = await api.get<MLBStatsResponse>(
+        `/people/${batter.id}/stats?stats=vsPlayer&opposingPlayerId=${opposingPitcherId}&group=hitting`
+      ).catch(() => null);
+      const h2hStat = (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits?.[0]?.stat ?? null;
       if (h2hStat) {
         const calc = calculateStats(h2hStat as Parameters<typeof calculateStats>[0]);
         h2hAtBats  = h2hStat.atBats ?? 0;
