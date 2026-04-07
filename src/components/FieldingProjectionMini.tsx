@@ -5,23 +5,24 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../constants';
 import { FieldSlotPlayer } from '../utils/fieldPositions';
 
 /**
- * Slot positions (% of canvas) aligned to the sector field model below.
+ * Slot positions (% of canvas) — match SVG diamond (B2 54, B1/B3 69, mound ~61, home ~82–88).
+ * Infield chips sit toward OF (smaller y) and inset from edges; C/DH lower so labels aren’t clipped.
  */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
-  { key: 'LF', x: 12, y: 20 },
-  { key: 'CF', x: 50, y: 18 },
-  { key: 'RF', x: 88, y: 20 },
-  { key: '3B', x: 26, y: 62 },
-  { key: 'SS', x: 38, y: 52 },
-  { key: '2B', x: 50, y: 44 },
-  { key: '1B', x: 74, y: 62 },
-  { key: 'P', x: 50, y: 58 },
-  { key: 'C', x: 50, y: 62 },
-  { key: 'DH', x: 8, y: 80 },
+  { key: 'LF', x: 18, y: 16 },
+  { key: 'CF', x: 50, y: 12 },
+  { key: 'RF', x: 82, y: 16 },
+  { key: '3B', x: 30, y: 50 },
+  { key: 'SS', x: 38, y: 44 },
+  { key: '2B', x: 50, y: 42 },
+  { key: '1B', x: 70, y: 50 },
+  { key: 'P', x: 50, y: 54 },
+  { key: 'C', x: 50, y: 70 },
+  { key: 'DH', x: 14, y: 74 },
 ];
 
-const LABEL_W = 58;
-const LABEL_H = 30;
+const LABEL_W = 56;
+const LABEL_H = 28;
 
 const VB_W = 100;
 const VB_H = 100;
@@ -161,9 +162,10 @@ const BaseballFieldSvg: React.FC = () => {
 const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress }) => (
   <View style={styles.half}>
     <Text style={styles.teamAbbr}>{abbr}</Text>
+    {/* Outer shell: overflow visible so labels are not clipped; inner clips only the SVG */}
     <View style={styles.fieldShell}>
       <View style={styles.canvas}>
-        <View style={styles.svgLayer} pointerEvents="none">
+        <View style={styles.svgClip} pointerEvents="none">
           <BaseballFieldSvg />
         </View>
         {SLOT_COORDS.map(({ key, x, y }) => {
@@ -187,7 +189,7 @@ const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress }) 
               accessibilityLabel={p ? `${key} ${p.lastName}` : `${key} empty`}
             >
               <Text style={styles.slotKey}>{key}</Text>
-              <Text style={styles.slotName} numberOfLines={1}>
+              <Text style={styles.slotName} numberOfLines={1} ellipsizeMode="tail">
                 {p?.lastName ?? '—'}
               </Text>
             </TouchableOpacity>
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   },
   fieldShell: {
     borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    overflow: 'visible',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     backgroundColor: '#2d5a36',
@@ -261,15 +263,17 @@ const styles = StyleSheet.create({
     position: 'relative',
     ...Platform.select({
       web: {
-        // RN-web: percentage height inside flex/ScrollView can collapse; aspectRatio still sets height from width
         display: 'block',
         minHeight: 1,
       },
       default: {},
     }),
   },
-  svgLayer: {
+  /** Clips only the grass graphic to rounded corners; labels sit above in canvas */
+  svgClip: {
     ...StyleSheet.absoluteFillObject,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
     ...Platform.select({
       web: {
         display: 'block',
@@ -281,10 +285,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: LABEL_W,
     minHeight: LABEL_H,
+    maxWidth: LABEL_W,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
     backgroundColor: 'rgba(15, 35, 20, 0.82)',
     borderRadius: 5,
     borderWidth: Platform.OS === 'web' ? 0 : StyleSheet.hairlineWidth,
@@ -309,11 +314,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   slotName: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    maxWidth: LABEL_W - 6,
+    maxWidth: LABEL_W - 4,
   },
   centerRule: {
     width: 1,
