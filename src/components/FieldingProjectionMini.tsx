@@ -6,19 +6,19 @@ import { FieldSlotPlayer } from '../utils/fieldPositions';
 
 /**
  * Slot positions (% of canvas) — match SVG diamond (B2 54, B1/B3 69, mound ~61, home ~82–88).
- * Infield chips sit toward OF (smaller y) and inset from edges; C/DH lower so labels aren’t clipped.
+ * OF pulled in toward diamond; 2B nudged right (1B side); infield + C shifted up toward OF.
  */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
-  { key: 'LF', x: 18, y: 16 },
-  { key: 'CF', x: 50, y: 12 },
-  { key: 'RF', x: 82, y: 16 },
-  { key: '3B', x: 30, y: 50 },
-  { key: 'SS', x: 38, y: 44 },
-  { key: '2B', x: 50, y: 42 },
-  { key: '1B', x: 70, y: 50 },
-  { key: 'P', x: 50, y: 54 },
-  { key: 'C', x: 50, y: 70 },
-  { key: 'DH', x: 14, y: 74 },
+  { key: 'LF', x: 22, y: 22 },
+  { key: 'CF', x: 50, y: 22 },
+  { key: 'RF', x: 78, y: 22 },
+  { key: '3B', x: 30, y: 44 },
+  { key: 'SS', x: 38, y: 38 },
+  { key: '2B', x: 56, y: 36 },
+  { key: '1B', x: 70, y: 44 },
+  { key: 'P', x: 50, y: 48 },
+  { key: 'C', x: 50, y: 62 },
+  { key: 'DH', x: 14, y: 72 },
 ];
 
 const LABEL_W = 56;
