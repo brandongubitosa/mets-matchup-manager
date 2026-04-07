@@ -86,13 +86,13 @@ export const BullpenFatigueCard: React.FC<BullpenFatigueCardProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bullpen Availability</Text>
+      <Text style={styles.title}>Pitching availability</Text>
       <Text style={styles.subtitle}>Relief pitcher fatigue — last 7 days</Text>
 
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="small" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading bullpen data...</Text>
+          <Text style={styles.loadingText}>Loading pitching data...</Text>
         </View>
       ) : (
         <>

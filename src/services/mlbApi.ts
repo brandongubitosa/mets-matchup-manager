@@ -2288,17 +2288,17 @@ export const predictGame = async (params: {
       }
     }
 
-    // Bullpen strength comparison
+    // Team pitching staff comparison (starters + relievers)
     if (homeData.staffStats && awayData.staffStats) {
       const homeStaffEra = parseFloat(homeData.staffStats.era);
       const awayStaffEra = parseFloat(awayData.staffStats.era);
       if (homeStaffEra < awayStaffEra - 0.4) {
         keyFactors.push(
-          `${homeTeamName}'s bullpen has an edge (staff ERA ${homeData.staffStats.era} vs ${awayData.staffStats.era})`
+          `${homeTeamName}'s pitching staff has an edge (ERA ${homeData.staffStats.era} vs ${awayData.staffStats.era})`
         );
       } else if (awayStaffEra < homeStaffEra - 0.4) {
         keyFactors.push(
-          `${awayTeamName}'s bullpen has an edge (staff ERA ${awayData.staffStats.era} vs ${homeData.staffStats.era})`
+          `${awayTeamName}'s pitching staff has an edge (ERA ${awayData.staffStats.era} vs ${homeData.staffStats.era})`
         );
       }
     }

@@ -16,6 +16,7 @@ export { PitchArsenalCard } from './PitchArsenalCard';
 export { RecentFormCard } from './RecentFormCard';
 export { BatterSplitsCard } from './BatterSplitsCard';
 export { BullpenFatigueCard } from './BullpenFatigueCard';
+export { FieldingProjectionMini } from './FieldingProjectionMini';
 export { SprayChartCard } from './SprayChartCard';
 export { WeatherCard } from './WeatherCard';
 export { UmpireCard } from './UmpireCard';
