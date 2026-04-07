@@ -22,6 +22,8 @@ export interface Player {
 
 export interface MatchupStats {
   gamesPlayed: number;
+  /** Plate appearances (when provided by MLB vs-pitcher splits). */
+  plateAppearances?: number;
   atBats: number;
   hits: number;
   doubles: number;
@@ -206,6 +208,8 @@ export interface BatterPredictionItem {
   recentGames?: number;  // games sampled in recent window
   h2hOPS: number;
   h2hAtBats: number;
+  /** Career PA vs this pitcher (same source as MatchupDetail career H2H). */
+  h2hPlateAppearances: number;
   h2hSeason?: number;
   effectiveOPS: number;
   platoonAdvantage: 'advantage' | 'disadvantage' | 'neutral' | 'switch';

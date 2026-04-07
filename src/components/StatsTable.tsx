@@ -97,6 +97,9 @@ export const StatsTable: React.FC<StatsTableProps> = ({ stats, title }) => {
       {stats.gamesPlayed > 0 && (
         <Text style={styles.games}>
           Based on {stats.gamesPlayed} game{stats.gamesPlayed !== 1 ? 's' : ''}
+          {stats.plateAppearances != null && stats.plateAppearances > 0
+            ? ` · ${stats.plateAppearances} PA · ${stats.atBats} AB`
+            : ''}
         </Text>
       )}
     </Animated.View>

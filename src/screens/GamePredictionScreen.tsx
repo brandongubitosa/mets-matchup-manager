@@ -283,7 +283,7 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: 
         </View>
       )}
       <Text style={lineupStyles.h2h}>
-        {item.h2hAtBats > 0 ? `${item.h2hAtBats} PA` : '—'}
+        {item.h2hPlateAppearances > 0 ? `${item.h2hPlateAppearances} PA` : '—'}
       </Text>
       <View style={lineupStyles.opsCol}>
         <Text style={lineupStyles.ops}>{item.effectiveOPS.toFixed(3)}</Text>

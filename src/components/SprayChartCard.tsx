@@ -86,7 +86,7 @@ export const SprayChartCard: React.FC<SprayChartCardProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>Spray Chart</Text>
       <Text style={styles.subtitle}>
-        {batterName} — balls in play by field ({seasonYear} season)
+        {batterName} — share of balls in play by field ({seasonYear} season; MLB index, zones sum to 100)
       </Text>
 
       {loading ? (
@@ -186,7 +186,6 @@ export const SprayChartCard: React.FC<SprayChartCardProps> = ({
               );
             })}
           </View>
-          <Text style={styles.totalText}>{data.total} balls in play</Text>
         </View>
       )}
     </View>
@@ -246,11 +245,6 @@ const styles = StyleSheet.create({
   statPct: {
     fontSize: 10,
     color: COLORS.textMuted,
-  },
-  totalText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs,
   },
   centered: {
     alignItems: 'center',
