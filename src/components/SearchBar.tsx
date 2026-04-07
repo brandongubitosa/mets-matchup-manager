@@ -70,6 +70,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }}
             style={styles.clearButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            accessibilityHint="Removes the search text"
           >
             <View style={styles.clearCircle}>
               <Text style={styles.clearText}>x</Text>

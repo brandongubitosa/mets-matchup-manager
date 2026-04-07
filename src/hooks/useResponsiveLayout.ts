@@ -1,14 +1,14 @@
 import { useWindowDimensions, Platform } from 'react-native';
-import { getWebMaxContentWidth } from '../constants';
+import { getWebMaxContentWidth, BREAKPOINTS } from '../constants';
 
 /** Window size buckets for tuning layout on phones, tablets, and desktop web. */
 export const useResponsiveLayout = () => {
   const { width, height } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const maxContentWidth = isWeb ? getWebMaxContentWidth(width) : width;
-  const isCompact = width < 480;
-  const isTablet = width >= 768;
-  const isDesktop = width >= 1024;
+  const isCompact = width < BREAKPOINTS.SM;
+  const isTablet = width >= BREAKPOINTS.MD;
+  const isDesktop = width >= BREAKPOINTS.LG;
 
   return {
     windowWidth: width,

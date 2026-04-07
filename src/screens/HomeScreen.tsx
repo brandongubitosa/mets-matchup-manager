@@ -27,7 +27,7 @@ const teamList = Object.entries(MLB_TEAMS)
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
-  const { isTablet, isDesktop } = useResponsiveLayout();
+  const { isTablet } = useResponsiveLayout();
   const [showPicker, setShowPicker] = useState(false);
   const [teamSearch, setTeamSearch] = useState('');
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -91,7 +91,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View
         style={[
           styles.content,
-          (isTablet || isDesktop) && styles.contentWide,
+          isTablet && styles.contentWide,
         ]}
       >
         {/* Today's Game — fills available vertical space */}
@@ -216,6 +216,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <TouchableOpacity
                 onPress={() => { setShowPicker(false); setTeamSearch(''); }}
                 style={styles.modalCloseIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Close team picker"
+                accessibilityHint="Closes the team list and clears search"
               >
                 <Text style={styles.modalCloseText}>x</Text>
               </TouchableOpacity>
@@ -233,7 +236,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 autoCorrect={false}
               />
               {teamSearch.length > 0 && (
-                <TouchableOpacity onPress={() => setTeamSearch('')}>
+                <TouchableOpacity
+                  onPress={() => setTeamSearch('')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear team search"
+                  accessibilityHint="Removes text from the team search field"
+                >
                   <Text style={styles.searchClear}>x</Text>
                 </TouchableOpacity>
               )}

@@ -8,11 +8,12 @@ interface WebContainerProps {
 
 export const WebContainer: React.FC<WebContainerProps> = ({ children }) => {
   const { width } = useWindowDimensions();
-  const maxWidth = getWebMaxContentWidth(width);
 
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
+
+  const maxWidth = getWebMaxContentWidth(width);
 
   return (
     <View style={styles.outerContainer}>
