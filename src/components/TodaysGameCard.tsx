@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
@@ -7,6 +7,8 @@ import { useTodaysGame, useTeamRoster, useGameLineup } from '../hooks';
 import { TodaysGame, Player, LineupPlayer } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { SkeletonGameCard } from './SkeletonLoader';
+import { FieldingProjectionMini } from './FieldingProjectionMini';
+import { buildFieldMapFromLineup, buildFieldMapFromRoster } from '../utils/fieldPositions';
 
 interface TodaysGameCardProps {
   teamId: number;
@@ -82,11 +84,15 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   const myLineup: LineupPlayer[] = game?.isHome ? homeLineup : awayLineup;
   const oppLineup: LineupPlayer[] = game?.isHome ? awayLineup : homeLineup;
 
-  // Helper: convert LineupPlayer to display rows, falling back to roster
-  const getLastName = (fullName: string) => {
-    const parts = fullName.trim().split(' ');
-    return parts.length > 1 ? parts.slice(1).join(' ') : fullName;
-  };
+  const myFieldMap = useMemo(() => {
+    if (myLineup.length > 0) return buildFieldMapFromLineup(myLineup);
+    return buildFieldMapFromRoster(myBatters);
+  }, [myLineup, myBatters]);
+
+  const oppFieldMap = useMemo(() => {
+    if (oppLineup.length > 0) return buildFieldMapFromLineup(oppLineup);
+    return buildFieldMapFromRoster(oppBatters);
+  }, [oppLineup, oppBatters]);
 
   const displayLineupLoading = compact && (myRosterLoading || oppRosterLoading || lineupLoading);
 
@@ -307,18 +313,16 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         )
       )}
 
-      {/* Lineup section — compact mode only */}
+      {/* Fielding projection — compact: by defensive position (not batting order) */}
       {compact && (
         <View style={styles.lineupSection}>
-          {/* Column headers */}
-          <View style={styles.lineupHeader}>
-            <Text style={styles.lineupHeaderText}>{MLB_TEAMS[teamId]?.abbreviation}</Text>
-            <View style={styles.lineupHeaderDivider} />
-            <Text style={styles.lineupHeaderText}>{opponentAbbr}</Text>
-          </View>
+          <Text style={styles.fieldSectionTitle}>Fielding projection</Text>
+          <Text style={styles.fieldSectionHint}>
+            Players on the field by position. Batting order updates when lineups are official.
+          </Text>
           {!displayLineupLoading && (myLineup.length === 0 || oppLineup.length === 0) && (
             <View style={styles.projectedBanner}>
-              <Text style={styles.projectedBannerText}>PROJECTED LINEUP</Text>
+              <Text style={styles.projectedBannerText}>PROJECTED POSITIONS</Text>
             </View>
           )}
 
@@ -328,90 +332,21 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             </View>
           ) : (
             <ScrollView
-              style={styles.lineupScroll}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.fieldScrollContent}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
               }
             >
-              {Array.from({ length: 9 }).map((_, i) => {
-                // Prefer real lineup; fall back to roster order
-                const myPlayer = myLineup[i];
-                const oppPlayer = oppLineup[i];
-                const myRoster = myBatters[i];
-                const oppRoster = oppBatters[i];
-
-                const myName = myPlayer
-                  ? getLastName(myPlayer.fullName)
-                  : myRoster?.lastName ?? null;
-                const myPos = myPlayer?.position ?? myRoster?.position?.abbreviation ?? null;
-                const myHand = myRoster?.batSide?.code ?? null;
-
-                const oppName = oppPlayer
-                  ? getLastName(oppPlayer.fullName)
-                  : oppRoster?.lastName ?? null;
-                const oppPos = oppPlayer?.position ?? oppRoster?.position?.abbreviation ?? null;
-                const oppHand = oppRoster?.batSide?.code ?? null;
-
-                const myId = myPlayer?.playerId ?? myRoster?.id ?? null;
-                const oppId = oppPlayer?.playerId ?? oppRoster?.id ?? null;
-                const isCleanup = i < 3;
-
-                return (
-                  <View key={i} style={[styles.lineupRow, i % 2 === 1 && styles.lineupRowAlt, isCleanup && styles.lineupRowCleanup]}>
-                    {/* Order number */}
-                    <Text style={styles.lineupOrder}>{i + 1}</Text>
-                    {/* My player */}
-                    <TouchableOpacity
-                      style={styles.lineupCell}
-                      disabled={!onPlayerPress || !myId}
-                      onPress={() => myId && onPlayerPress?.(myId, game.opponent.id, game.opponent.name)}
-                      activeOpacity={0.7}
-                    >
-                      {myName ? (
-                        <>
-                          {myPos ? (
-                            <View style={styles.posBadge}>
-                              <Text style={styles.posBadgeText}>{myPos}</Text>
-                            </View>
-                          ) : null}
-                          <Text style={[styles.lineupName, isCleanup && styles.lineupNameCleanup]} numberOfLines={1}>
-                            {myName}
-                          </Text>
-                          {myHand ? (
-                            <Text style={styles.handBadge}>{myHand}</Text>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </TouchableOpacity>
-                    {/* Center divider */}
-                    <View style={styles.lineupRowDivider} />
-                    {/* Opp player */}
-                    <TouchableOpacity
-                      style={[styles.lineupCell, styles.lineupCellRight]}
-                      disabled={!onPlayerPress || !oppId}
-                      onPress={() => oppId && onPlayerPress?.(oppId, game.opponent.id, game.opponent.name)}
-                      activeOpacity={0.7}
-                    >
-                      {oppName ? (
-                        <>
-                          {oppHand ? (
-                            <Text style={styles.handBadge}>{oppHand}</Text>
-                          ) : null}
-                          <Text style={[styles.lineupName, isCleanup && styles.lineupNameCleanup]} numberOfLines={1}>
-                            {oppName}
-                          </Text>
-                          {oppPos ? (
-                            <View style={styles.posBadge}>
-                              <Text style={styles.posBadgeText}>{oppPos}</Text>
-                            </View>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+              <FieldingProjectionMini
+                myAbbr={MLB_TEAMS[teamId]?.abbreviation ?? '—'}
+                oppAbbr={opponentAbbr}
+                myFieldMap={myFieldMap}
+                oppFieldMap={oppFieldMap}
+                onPlayerPress={onPlayerPress}
+                opponentTeamId={game.opponent.id}
+                opponentTeamName={game.opponent.name}
+              />
             </ScrollView>
           )}
         </View>
@@ -625,27 +560,19 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  lineupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.borderLight,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-  },
-  lineupHeaderText: {
-    flex: 1,
-    fontSize: FONT_SIZE.xs,
+  fieldSectionTitle: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '800',
-    color: COLORS.textSecondary,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+    color: COLORS.textPrimary,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
   },
-  lineupHeaderDivider: {
-    width: 1,
-    height: 12,
-    backgroundColor: COLORS.textMuted,
-    opacity: 0.3,
+  fieldSectionHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xs,
+    lineHeight: 16,
   },
   projectedBanner: {
     backgroundColor: `${COLORS.secondary}18`,
@@ -664,71 +591,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.lg,
   },
-  lineupScroll: {
-    flex: 1,
-  },
-  lineupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: SPACING.sm,
-  },
-  lineupRowAlt: {
-    backgroundColor: COLORS.borderLight,
-  },
-  lineupOrder: {
-    width: 14,
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginRight: 2,
-  },
-  lineupCell: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  lineupCellRight: {
-    justifyContent: 'flex-end',
-  },
-  lineupRowDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: COLORS.borderLight,
-    marginHorizontal: SPACING.xs,
-  },
-  posBadge: {
-    backgroundColor: `${COLORS.primary}12`,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: RADIUS.sm,
-  },
-  posBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: COLORS.primary,
-    letterSpacing: 0.3,
-  },
-  lineupName: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  lineupNameCleanup: {
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  lineupRowCleanup: {
-    backgroundColor: `${COLORS.primary}08`,
-  },
-  handBadge: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    opacity: 0.7,
+  fieldScrollContent: {
+    paddingHorizontal: SPACING.xs,
+    paddingBottom: SPACING.sm,
   },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,

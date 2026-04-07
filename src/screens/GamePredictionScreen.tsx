@@ -684,13 +684,13 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           </AnimatedCard>
         )}
 
-        {/* Bullpen Comparison */}
+        {/* Pitching comparison (team staff) */}
         {(homeTeam.staffStats || awayTeam.staffStats) && (
           <AnimatedCard delay={150}>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Bullpen Comparison</Text>
+              <Text style={styles.sectionTitle}>Pitching comparison</Text>
               <View style={styles.bullpenRow}>
-                {/* Away bullpen */}
+                {/* Away */}
                 <View style={styles.bullpenCard}>
                   <Text style={styles.bullpenTeam}>{awayAbbr}</Text>
                   {awayTeam.staffStats ? (
@@ -713,7 +713,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                   )}
                 </View>
                 <View style={styles.bullpenDivider} />
-                {/* Home bullpen */}
+                {/* Home */}
                 <View style={styles.bullpenCard}>
                   <Text style={styles.bullpenTeam}>{homeAbbr}</Text>
                   {homeTeam.staffStats ? (
@@ -745,7 +745,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           </AnimatedCard>
         )}
 
-        {/* Bullpen Availability */}
+        {/* Pitching availability (reliefs) */}
         <AnimatedCard delay={175}>
           <BullpenFatigueCard
             homeTeam={homeBullpen}
