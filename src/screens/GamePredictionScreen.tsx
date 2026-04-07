@@ -10,15 +10,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
-import { AnimatedCard, TeamLogo } from '../components';
+import { AnimatedCard, TeamLogo, BullpenFatigueCard, WeatherCard, UmpireCard } from '../components';
 import {
   GamePredictionScreenNavigationProp,
   GamePredictionScreenRouteProp,
   GamePredictionResult,
   BatterPredictionItem,
   LiveGameState,
+  TeamBullpenStatus,
 } from '../types';
-import { predictGame } from '../services/mlbApi';
+import { predictGame, getTeamBullpenFatigue, getGameWeather, GameWeather, getUmpireStats, UmpireStats } from '../services/mlbApi';
 
 type Props = {
   navigation: GamePredictionScreenNavigationProp;
@@ -113,9 +114,10 @@ const PitcherStatsCard: React.FC<{
   era: string;
   whip: string;
   strikeouts: number;
+  fip?: string;
   isWinner: boolean;
   onPress?: () => void;
-}> = ({ label, name, hand, era, whip, strikeouts, isWinner, onPress }) => {
+}> = ({ label, name, hand, era, whip, strikeouts, fip, isWinner, onPress }) => {
   const inner = (
     <View style={[pitcherStyles.card, isWinner && pitcherStyles.winnerCard]}>
       {isWinner && (
@@ -135,6 +137,12 @@ const PitcherStatsCard: React.FC<{
           <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{era}</Text>
           <Text style={pitcherStyles.statLabel}>ERA</Text>
         </View>
+        {fip && (
+          <View style={pitcherStyles.stat}>
+            <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{fip}</Text>
+            <Text style={pitcherStyles.statLabel}>FIP</Text>
+          </View>
+        )}
         <View style={pitcherStyles.stat}>
           <Text style={[pitcherStyles.statVal, isWinner && pitcherStyles.winnerText]}>{whip}</Text>
           <Text style={pitcherStyles.statLabel}>WHIP</Text>
@@ -345,6 +353,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
     opponentTeamId,
     opponentTeamName,
     isHome,
+    gameId,
     teamPitcherId,
     opponentPitcherId,
   } = route.params;
@@ -362,7 +371,15 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
   const [prediction, setPrediction] = useState<GamePredictionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loadingStep, setLoadingStep] = useState('Loading rosters...');
+  const [retryKey, setRetryKey] = useState(0);
+  const [homeBullpen, setHomeBullpen] = useState<TeamBullpenStatus | null>(null);
+  const [awayBullpen, setAwayBullpen] = useState<TeamBullpenStatus | null>(null);
+  const [bullpenLoading, setBullpenLoading] = useState(true);
+  const [weather, setWeather] = useState<GameWeather | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [umpire, setUmpire] = useState<UmpireStats | null>(null);
+  const [umpireLoading, setUmpireLoading] = useState(true);
+  const [umpireNoData, setUmpireNoData] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -370,18 +387,6 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
     const run = async () => {
       setLoading(true);
       setError(null);
-      setLoadingStep('Loading rosters...');
-
-      // Simulate progress steps for UX
-      const stepTimer = setTimeout(() => {
-        if (!cancelled) setLoadingStep('Fetching pitcher stats & recent form...');
-      }, 1500);
-      const stepTimer2 = setTimeout(() => {
-        if (!cancelled) setLoadingStep('Checking live game state...');
-      }, 3000);
-      const stepTimer3 = setTimeout(() => {
-        if (!cancelled) setLoadingStep('Calculating win probability...');
-      }, 5000);
 
       const result = await predictGame({
         homeTeamId,
@@ -390,11 +395,8 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
         awayTeamName,
         homePitcherId,
         awayPitcherId,
+        gameId,
       });
-
-      clearTimeout(stepTimer);
-      clearTimeout(stepTimer2);
-      clearTimeout(stepTimer3);
 
       if (cancelled) return;
 
@@ -406,9 +408,52 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
       setLoading(false);
     };
 
+    const fetchBullpen = async () => {
+      setBullpenLoading(true);
+      const [homeResult, awayResult] = await Promise.all([
+        getTeamBullpenFatigue(homeTeamId, homeTeamName, homePitcherId),
+        getTeamBullpenFatigue(awayTeamId, awayTeamName, awayPitcherId),
+      ]);
+      if (!cancelled) {
+        setHomeBullpen(homeResult.success ? homeResult.data : null);
+        setAwayBullpen(awayResult.success ? awayResult.data : null);
+        setBullpenLoading(false);
+      }
+    };
+
+    const fetchWeather = async () => {
+      setWeatherLoading(true);
+      const result = await getGameWeather(homeTeamId);
+      if (!cancelled) {
+        setWeather(result.success ? result.data : null);
+        setWeatherLoading(false);
+      }
+    };
+
+    const fetchUmpire = async () => {
+      if (!gameId) {
+        setUmpireNoData(true);
+        setUmpireLoading(false);
+        return;
+      }
+      setUmpireLoading(true);
+      const result = await getUmpireStats(gameId);
+      if (!cancelled) {
+        if (result.success) {
+          setUmpire(result.data);
+        } else {
+          setUmpireNoData(true);
+        }
+        setUmpireLoading(false);
+      }
+    };
+
     run();
+    fetchBullpen();
+    fetchWeather();
+    fetchUmpire();
     return () => { cancelled = true; };
-  }, [homeTeamId, awayTeamId, homePitcherId, awayPitcherId]);
+  }, [homeTeamId, awayTeamId, homePitcherId, awayPitcherId, retryKey]);
 
   if (loading) {
     return (
@@ -422,7 +467,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
         </LinearGradient>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{loadingStep}</Text>
+          <Text style={styles.loadingText}>Analyzing matchup...</Text>
           <Text style={styles.loadingSubtext}>
             Analyzing lineups and pitching matchups...
           </Text>
@@ -442,9 +487,14 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error ?? 'Something went wrong'}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.retryBtnText}>Go Back</Text>
-          </TouchableOpacity>
+          <View style={styles.errorButtons}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => setRetryKey(k => k + 1)}>
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.retryBtn, styles.retryBtnSecondary]} onPress={() => navigation.goBack()}>
+              <Text style={[styles.retryBtnText, styles.retryBtnTextSecondary]}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -551,10 +601,20 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
 
             <View style={styles.disclaimer}>
               <Text style={styles.disclaimerText}>
-                Based on season OPS, 15-day batter form, H2H history, platoon matchups, pitcher ERA/WHIP/K rate, 3-week pitcher form, park factor ({parkFactor.toFixed(2)}){isLive ? ', and live score' : ''}
+                Model: batting-order-weighted OPS · 15-day form · H2H history · platoon splits · FIP/ERA/WHIP/K · Pythagorean run differential · last-10 momentum · park factor ({parkFactor.toFixed(2)}){isLive ? ' · live score' : ''}
               </Text>
             </View>
           </View>
+        </AnimatedCard>
+
+        {/* Weather */}
+        <AnimatedCard delay={90}>
+          <WeatherCard weather={weather} loading={weatherLoading} />
+        </AnimatedCard>
+
+        {/* Umpire */}
+        <AnimatedCard delay={95}>
+          <UmpireCard stats={umpire} loading={umpireLoading} noData={umpireNoData} />
         </AnimatedCard>
 
         {/* Pitching Matchup */}
@@ -568,11 +628,19 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                   name={awayTeam.pitcher?.fullName ?? 'TBD'}
                   hand={awayTeam.pitcher?.pitchHand?.code}
                   era={awayTeam.pitcherStats?.era ?? '—'}
+                  fip={awayTeam.pitcherStats?.fip}
                   whip={awayTeam.pitcherStats?.whip ?? '—'}
                   strikeouts={awayTeam.pitcherStats?.strikeouts ?? 0}
                   isWinner={!homePitcherEdge && !!awayTeam.pitcherStats}
                   onPress={
-                    awayTeam.pitcher
+                    awayTeam.pitcher && homeTeam.batters.length > 0
+                      ? () =>
+                          navigation.navigate('MatchupDetail', {
+                            batterId: homeTeam.batters[0].id,
+                            pitcherId: awayTeam.pitcher!.id,
+                            mode: 'pitcher',
+                          })
+                      : awayTeam.pitcher
                       ? () =>
                           navigation.navigate('PlayerBackCard', {
                             playerId: awayTeam.pitcher!.id,
@@ -588,11 +656,19 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                   name={homeTeam.pitcher?.fullName ?? 'TBD'}
                   hand={homeTeam.pitcher?.pitchHand?.code}
                   era={homeTeam.pitcherStats?.era ?? '—'}
+                  fip={homeTeam.pitcherStats?.fip}
                   whip={homeTeam.pitcherStats?.whip ?? '—'}
                   strikeouts={homeTeam.pitcherStats?.strikeouts ?? 0}
                   isWinner={homePitcherEdge && !!homeTeam.pitcherStats}
                   onPress={
-                    homeTeam.pitcher
+                    homeTeam.pitcher && awayTeam.batters.length > 0
+                      ? () =>
+                          navigation.navigate('MatchupDetail', {
+                            batterId: awayTeam.batters[0].id,
+                            pitcherId: homeTeam.pitcher!.id,
+                            mode: 'pitcher',
+                          })
+                      : homeTeam.pitcher
                       ? () =>
                           navigation.navigate('PlayerBackCard', {
                             playerId: homeTeam.pitcher!.id,
@@ -669,6 +745,17 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           </AnimatedCard>
         )}
 
+        {/* Bullpen Availability */}
+        <AnimatedCard delay={175}>
+          <BullpenFatigueCard
+            homeTeam={homeBullpen}
+            awayTeam={awayBullpen}
+            homeAbbr={homeAbbr}
+            awayAbbr={awayAbbr}
+            loading={bullpenLoading}
+          />
+        </AnimatedCard>
+
         {/* Key Factors */}
         <AnimatedCard delay={200}>
           <View style={styles.section}>
@@ -695,15 +782,15 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                 key={b.id}
                 item={b}
                 rank={i + 1}
-                onPress={() =>
-                  navigation.navigate('PlayerBackCard', {
-                    playerId: b.id,
-                    counterpartPlayerId: homeTeam.pitcher?.id,
-                    counterpartPlayerName: homeTeam.pitcher?.fullName,
-                    opponentTeamId: homeTeam.teamId,
-                    opponentTeamName: homeTeam.teamName,
-                    backToGamePrediction: gpParams,
-                  })
+                onPress={
+                  homeTeam.pitcher
+                    ? () =>
+                        navigation.navigate('MatchupDetail', {
+                          batterId: b.id,
+                          pitcherId: homeTeam.pitcher!.id,
+                          mode: 'batter',
+                        })
+                    : undefined
                 }
               />
             ))}
@@ -727,15 +814,15 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                 key={b.id}
                 item={b}
                 rank={i + 1}
-                onPress={() =>
-                  navigation.navigate('PlayerBackCard', {
-                    playerId: b.id,
-                    counterpartPlayerId: awayTeam.pitcher?.id,
-                    counterpartPlayerName: awayTeam.pitcher?.fullName,
-                    opponentTeamId: awayTeam.teamId,
-                    opponentTeamName: awayTeam.teamName,
-                    backToGamePrediction: gpParams,
-                  })
+                onPress={
+                  awayTeam.pitcher
+                    ? () =>
+                        navigation.navigate('MatchupDetail', {
+                          batterId: b.id,
+                          pitcherId: awayTeam.pitcher!.id,
+                          mode: 'batter',
+                        })
+                    : undefined
                 }
               />
             ))}
@@ -827,16 +914,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
+  errorButtons: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
   retryBtn: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.sm,
   },
+  retryBtnSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
   retryBtnText: {
     color: COLORS.white,
     fontWeight: '600',
     fontSize: FONT_SIZE.base,
+  },
+  retryBtnTextSecondary: {
+    color: COLORS.textSecondary,
   },
 
   // Live game card

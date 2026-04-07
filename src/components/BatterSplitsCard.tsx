@@ -63,7 +63,7 @@ export const BatterSplitsCard: React.FC<BatterSplitsCardProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>Batter Splits</Text>
       <Text style={styles.subtitle}>
-        {batterName} — 2025 season
+        {batterName} — {new Date().getFullYear()} season
         {pitcherHand ? `  ·  Facing ${pitcherHand}HP` : ''}
       </Text>
 

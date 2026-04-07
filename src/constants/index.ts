@@ -154,3 +154,37 @@ export const getTeamLogoUrl = (teamId: number, size: number = 100): string => {
 export const getTeamLogoPngUrl = (teamId: number): string => {
   return `https://www.mlbstatic.com/team-logos/team-cap-on-light/${teamId}.svg`;
 };
+
+// Ballpark coordinates and dome status, keyed by home team ID
+export const BALLPARK_INFO: Record<number, { lat: number; lng: number; name: string; dome: boolean; timezone: string }> = {
+  108: { lat: 33.8003, lng: -117.8827, name: 'Angel Stadium',          dome: false, timezone: 'America/Los_Angeles' },
+  109: { lat: 33.4453, lng: -112.0667, name: 'Chase Field',            dome: true,  timezone: 'America/Phoenix' },
+  110: { lat: 39.2838, lng: -76.6218,  name: 'Oriole Park',            dome: false, timezone: 'America/New_York' },
+  111: { lat: 42.3467, lng: -71.0972,  name: 'Fenway Park',            dome: false, timezone: 'America/New_York' },
+  112: { lat: 41.9484, lng: -87.6553,  name: 'Wrigley Field',          dome: false, timezone: 'America/Chicago' },
+  113: { lat: 39.0979, lng: -84.5082,  name: 'Great American Ball Park',dome: false, timezone: 'America/New_York' },
+  114: { lat: 41.4962, lng: -81.6852,  name: 'Progressive Field',      dome: false, timezone: 'America/New_York' },
+  115: { lat: 39.7559, lng: -104.9942, name: 'Coors Field',            dome: false, timezone: 'America/Denver' },
+  116: { lat: 42.3390, lng: -83.0485,  name: 'Comerica Park',          dome: false, timezone: 'America/New_York' },
+  117: { lat: 29.7572, lng: -95.3555,  name: 'Minute Maid Park',       dome: true,  timezone: 'America/Chicago' },
+  118: { lat: 39.0514, lng: -94.4803,  name: 'Kauffman Stadium',       dome: false, timezone: 'America/Chicago' },
+  119: { lat: 34.0739, lng: -118.2400, name: 'Dodger Stadium',         dome: false, timezone: 'America/Los_Angeles' },
+  120: { lat: 38.8730, lng: -77.0074,  name: 'Nationals Park',         dome: false, timezone: 'America/New_York' },
+  121: { lat: 40.7571, lng: -73.8458,  name: 'Citi Field',             dome: false, timezone: 'America/New_York' },
+  133: { lat: 37.7516, lng: -122.2005, name: 'Oakland Coliseum',       dome: false, timezone: 'America/Los_Angeles' },
+  134: { lat: 40.4469, lng: -80.0057,  name: 'PNC Park',               dome: false, timezone: 'America/New_York' },
+  135: { lat: 32.7073, lng: -117.1567, name: 'Petco Park',             dome: false, timezone: 'America/Los_Angeles' },
+  136: { lat: 47.5914, lng: -122.3325, name: 'T-Mobile Park',          dome: true,  timezone: 'America/Los_Angeles' },
+  137: { lat: 37.7786, lng: -122.3893, name: 'Oracle Park',            dome: false, timezone: 'America/Los_Angeles' },
+  138: { lat: 38.6226, lng: -90.1928,  name: 'Busch Stadium',          dome: false, timezone: 'America/Chicago' },
+  139: { lat: 27.7683, lng: -82.6534,  name: 'Tropicana Field',        dome: true,  timezone: 'America/New_York' },
+  140: { lat: 32.7512, lng: -97.0832,  name: 'Globe Life Field',       dome: true,  timezone: 'America/Chicago' },
+  141: { lat: 43.6414, lng: -79.3894,  name: 'Rogers Centre',          dome: true,  timezone: 'America/New_York' },
+  142: { lat: 44.9817, lng: -93.2778,  name: 'Target Field',           dome: false, timezone: 'America/Chicago' },
+  143: { lat: 39.9056, lng: -75.1665,  name: 'Citizens Bank Park',     dome: false, timezone: 'America/New_York' },
+  144: { lat: 33.8908, lng: -84.4677,  name: 'Truist Park',            dome: false, timezone: 'America/New_York' },
+  145: { lat: 41.8300, lng: -87.6339,  name: 'Guaranteed Rate Field',  dome: false, timezone: 'America/Chicago' },
+  146: { lat: 25.7781, lng: -80.2196,  name: 'loanDepot park',         dome: true,  timezone: 'America/New_York' },
+  147: { lat: 40.8296, lng: -73.9262,  name: 'Yankee Stadium',         dome: false, timezone: 'America/New_York' },
+  158: { lat: 43.0281, lng: -87.9712,  name: 'American Family Field',  dome: true,  timezone: 'America/Chicago' },
+};
