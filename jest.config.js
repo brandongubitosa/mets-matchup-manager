@@ -1,11 +1,6 @@
 module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  preset: 'jest-expo',
   testMatch: ['**/__tests__/**/*.test.(ts|tsx)'],
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', { isolatedModules: true }],
-  },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
@@ -14,4 +9,7 @@ module.exports = {
   moduleNameMapper: {
     '^axios$': '<rootDir>/node_modules/axios/dist/node/axios.cjs',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|axios-retry))',
+  ],
 };

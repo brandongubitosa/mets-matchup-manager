@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { lightImpact } from '../utils/haptics';
 
 interface AnimatedCardProps {
   children: React.ReactNode;
@@ -7,6 +8,10 @@ interface AnimatedCardProps {
   style?: ViewStyle;
   onPress?: () => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  /** Haptic feedback on press (native only). Default true when onPress is set. */
+  hapticOnPress?: boolean;
 }
 
 export const AnimatedCard: React.FC<AnimatedCardProps> = ({
@@ -15,6 +20,9 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   style,
   onPress,
   disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
+  hapticOnPress = true,
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
@@ -73,11 +81,19 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
     return (
       <Animated.View style={[animatedStyle, style]}>
         <Pressable
-          onPress={onPress}
+          onPress={() => {
+            if (hapticOnPress) {
+              lightImpact();
+            }
+            onPress();
+          }}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           disabled={disabled}
           style={[styles.pressable, webHoverStyle]}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={accessibilityHint}
         >
           {children}
         </Pressable>

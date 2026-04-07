@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { LiveGame } from '../types';
-import { getLiveScores } from '../services/mlbApi';
+import { getLiveScores, invalidateLiveScoresCache } from '../services/mlbApi';
 
 const POLL_INTERVAL_LIVE = 30_000;
 const POLL_INTERVAL_IDLE = 120_000;
@@ -12,7 +12,8 @@ interface UseLiveScoresReturn {
   error: string | null;
   lastUpdated: Date | null;
   hasLiveGames: boolean;
-  refetch: () => void;
+  /** Pass true (default) to bypass short-lived HTTP cache after pull-to-refresh or manual refresh. */
+  refetch: (forceRefresh?: boolean) => Promise<void>;
 }
 
 export const useLiveScores = (): UseLiveScoresReturn => {
@@ -27,9 +28,12 @@ export const useLiveScores = (): UseLiveScoresReturn => {
     (g) => g.status.abstractGameState === 'Live'
   );
 
-  const fetchScores = useCallback(async (showLoading = false) => {
+  const fetchScores = useCallback(async (showLoading = false, forceRefresh = false) => {
     if (showLoading) setLoading(true);
     setError(null);
+    if (forceRefresh) {
+      invalidateLiveScoresCache();
+    }
 
     const result = await getLiveScores();
 
@@ -47,11 +51,11 @@ export const useLiveScores = (): UseLiveScoresReturn => {
     if (intervalRef.current) clearInterval(intervalRef.current);
 
     const interval = hasLiveGames ? POLL_INTERVAL_LIVE : POLL_INTERVAL_IDLE;
-    intervalRef.current = setInterval(() => fetchScores(false), interval);
+    intervalRef.current = setInterval(() => fetchScores(false, false), interval);
   }, [hasLiveGames, fetchScores]);
 
   useEffect(() => {
-    fetchScores(true);
+    fetchScores(true, false);
   }, [fetchScores]);
 
   useEffect(() => {
@@ -64,7 +68,7 @@ export const useLiveScores = (): UseLiveScoresReturn => {
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        fetchScores(false);
+        fetchScores(false, false);
         startPolling();
       } else if (nextState.match(/inactive|background/)) {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -82,6 +86,6 @@ export const useLiveScores = (): UseLiveScoresReturn => {
     error,
     lastUpdated,
     hasLiveGames,
-    refetch: () => fetchScores(false),
+    refetch: (forceRefresh = true) => fetchScores(false, forceRefresh),
   };
 };

@@ -25,6 +25,11 @@ jest.mock('axios', () => {
   };
 });
 
+jest.mock('axios-retry', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
 // Get reference to mock function
 const mockGet = (axios as any).__mockGet;
 const MockAxiosError = (axios as any).AxiosError;
@@ -37,11 +42,21 @@ import {
   getBatterVsPitcher,
   getTodaysGame,
   getPlayerDetails,
+  formatLocalDateYMD,
 } from '../../services/mlbApi';
+import { __clearApiCacheForTests } from '../../services/apiCache';
 
 describe('mlbApi', () => {
   beforeEach(() => {
     mockGet.mockReset();
+    __clearApiCacheForTests();
+  });
+
+  describe('formatLocalDateYMD', () => {
+    it('formats local calendar date without UTC shift', () => {
+      const d = new Date(2026, 3, 7, 15, 30, 0);
+      expect(formatLocalDateYMD(d)).toBe('2026-04-07');
+    });
   });
 
   describe('getTeamRoster', () => {

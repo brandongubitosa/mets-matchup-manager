@@ -12,6 +12,7 @@ import {
   PlayerBackCardScreen,
 } from './src/screens';
 import { ErrorBoundary, WebContainer } from './src/components';
+import { WebDocumentHead } from './src/components/WebDocumentHead';
 import { COLORS } from './src/constants';
 import { RootStackParamList } from './src/types';
 import { Analytics } from '@vercel/analytics/react';
@@ -21,6 +22,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   return (
     <ErrorBoundary>
+      <WebDocumentHead />
       <WebContainer>
         <NavigationContainer>
           <StatusBar style="light" />

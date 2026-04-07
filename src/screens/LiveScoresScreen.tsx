@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -251,6 +252,12 @@ const LiveGameCard: React.FC<{
 export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, route }) => {
   const highlightTeamId = route.params?.highlightTeamId;
   const { games, loading, error, lastUpdated, hasLiveGames, refetch } = useLiveScores();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch(true);
+    setRefreshing(false);
+  }, [refetch]);
 
   const sortedGames = [...games].sort((a, b) => {
     const stateOrder: Record<string, number> = { Live: 0, Preview: 2, Final: 3 };
@@ -288,7 +295,13 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
               </View>
             )}
           </View>
-          <TouchableOpacity onPress={refetch} style={styles.refreshButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={() => refetch(true)}
+            style={styles.refreshButton}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh scores"
+          >
             <Text style={styles.refreshIcon}>↻</Text>
           </TouchableOpacity>
         </View>
@@ -310,7 +323,13 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
           <Text style={styles.errorIcon}>!</Text>
           <Text style={styles.errorTitle}>Unable to load scores</Text>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refetch} style={styles.retryButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={() => refetch(true)}
+            style={styles.retryButton}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading scores"
+          >
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
@@ -323,6 +342,9 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
         <FlatList
           data={sortedGames}
           keyExtractor={(item) => item.gamePk.toString()}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }
           renderItem={({ item }) => (
             <LiveGameCard
               game={item}

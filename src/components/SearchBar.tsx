@@ -61,6 +61,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           autoCorrect={false}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          accessibilityLabel="Search"
+          accessibilityHint="Type to filter the list below"
         />
         {value.length > 0 && (
           <TouchableOpacity
