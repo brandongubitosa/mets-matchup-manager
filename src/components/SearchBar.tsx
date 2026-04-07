@@ -50,7 +50,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           isFocused && styles.inputContainerFocused,
         ]}
       >
-        <Text style={styles.icon}>🔍</Text>
+        <Text style={styles.icon}>Search</Text>
         <TextInput
           style={styles.input}
           value={value}
@@ -70,9 +70,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }}
             style={styles.clearButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            accessibilityHint="Removes the search text"
           >
             <View style={styles.clearCircle}>
-              <Text style={styles.clearText}>✕</Text>
+              <Text style={styles.clearText}>x</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -100,8 +103,12 @@ const styles = StyleSheet.create({
     ...SHADOW.md,
   },
   icon: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.textMuted,
     marginRight: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   input: {
     flex: 1,

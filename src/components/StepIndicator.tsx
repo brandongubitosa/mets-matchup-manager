@@ -30,7 +30,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, currentStep
                 ]}
               >
                 {isCompleted ? (
-                  <Text style={styles.checkmark}>✓</Text>
+                  <View style={styles.checkInner} />
                 ) : (
                   <Text
                     style={[
@@ -111,10 +111,11 @@ const styles = StyleSheet.create({
   dotNumberActive: {
     color: COLORS.white,
   },
-  checkmark: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    color: COLORS.white,
+  checkInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.white,
   },
   label: {
     fontSize: FONT_SIZE.xs,

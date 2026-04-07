@@ -9,10 +9,10 @@ interface WeatherCardProps {
 }
 
 const IMPACT_CONFIG = {
-  'pitcher-friendly': { color: '#1D4ED8', bg: '#EFF6FF', icon: '⚾', label: 'Pitcher Friendly' },
-  'hitter-friendly':  { color: '#B45309', bg: '#FFFBEB', icon: '💥', label: 'Hitter Friendly'  },
-  'rain-risk':        { color: '#6B21A8', bg: '#FAF5FF', icon: '🌧', label: 'Rain Risk'         },
-  'neutral':          { color: '#374151', bg: '#F9FAFB', icon: '☁️', label: 'Neutral'           },
+  'pitcher-friendly': { color: '#1D4ED8', bg: '#EFF6FF', label: 'Pitcher Friendly' },
+  'hitter-friendly':  { color: '#B45309', bg: '#FFFBEB', label: 'Hitter Friendly' },
+  'rain-risk':        { color: '#6B21A8', bg: '#FAF5FF', label: 'Rain Risk' },
+  'neutral':          { color: '#374151', bg: '#F9FAFB', label: 'Neutral' },
 };
 
 // Draw a simple wind direction arrow by rotating an arrow character
@@ -40,7 +40,6 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, loading = fal
 
           {weather.isDome ? (
             <View style={styles.domeRow}>
-              <Text style={styles.domeIcon}>🏟️</Text>
               <Text style={styles.domeText}>Indoor stadium — controlled environment</Text>
             </View>
           ) : (
@@ -83,7 +82,6 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, loading = fal
 
               {/* Impact banner */}
               <View style={[styles.impactBanner, { backgroundColor: IMPACT_CONFIG[weather.impact].bg }]}>
-                <Text style={styles.impactIcon}>{IMPACT_CONFIG[weather.impact].icon}</Text>
                 <View style={styles.impactText}>
                   <Text style={[styles.impactLabel, { color: IMPACT_CONFIG[weather.impact].color }]}>
                     {IMPACT_CONFIG[weather.impact].label}
@@ -169,9 +167,6 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
     borderRadius: RADIUS.md,
   },
-  impactIcon: {
-    fontSize: 22,
-  },
   impactText: {
     flex: 1,
   },
@@ -191,9 +186,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.borderLight,
     padding: SPACING.sm,
     borderRadius: RADIUS.md,
-  },
-  domeIcon: {
-    fontSize: 22,
   },
   domeText: {
     fontSize: FONT_SIZE.sm,

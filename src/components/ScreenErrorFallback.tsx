@@ -17,7 +17,7 @@ export const ScreenErrorFallback: React.FC<ScreenErrorFallbackProps> = ({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content} accessibilityRole="alert">
-        <Text style={styles.icon}>⚠️</Text>
+        <Text style={styles.icon}>!</Text>
         <Text style={styles.title}>Oops!</Text>
         <Text style={styles.message}>
           {error?.message || 'Something went wrong while loading this screen.'}

@@ -108,7 +108,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {selected && (
             <View style={styles.cardSelectedOverlay}>
               <View style={styles.cardCheckCircle}>
-                <Text style={styles.cardCheckText}>✓</Text>
+                <View style={styles.cardCheckMark} />
               </View>
             </View>
           )}
@@ -174,7 +174,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
       )}
       {selected && (
         <View style={styles.listSelectedBadge}>
-          <Text style={styles.listSelectedCheck}>✓</Text>
+          <View style={styles.listSelectedMark} />
         </View>
       )}
     </TouchableOpacity>
@@ -303,10 +303,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardCheckText: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: FONT_SIZE.sm,
+  cardCheckMark: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.white,
   },
 
   // ── List Variant ───────────────────────────────────────────────────────────
@@ -402,9 +403,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: SPACING.sm,
   },
-  listSelectedCheck: {
-    color: COLORS.white,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
+  listSelectedMark: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.white,
   },
 });

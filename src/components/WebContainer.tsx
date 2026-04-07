@@ -1,19 +1,23 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import { COLORS, WEB_MAX_WIDTH } from '../constants';
+import { View, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { COLORS, getWebMaxContentWidth } from '../constants';
 
 interface WebContainerProps {
   children: React.ReactNode;
 }
 
 export const WebContainer: React.FC<WebContainerProps> = ({ children }) => {
+  const { width } = useWindowDimensions();
+
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
 
+  const maxWidth = getWebMaxContentWidth(width);
+
   return (
     <View style={styles.outerContainer}>
-      <View style={styles.innerContainer}>
+      <View style={[styles.innerContainer, { maxWidth }]}>
         {children}
       </View>
     </View>
@@ -29,7 +33,6 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: WEB_MAX_WIDTH,
     backgroundColor: COLORS.background,
     // Web-only shadow effect
     ...(Platform.OS === 'web'

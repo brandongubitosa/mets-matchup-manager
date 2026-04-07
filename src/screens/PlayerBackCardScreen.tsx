@@ -166,7 +166,7 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
     <SafeAreaView style={styles.safe} edges={['top']}>
       <LinearGradient colors={['#E8B4A8', '#D4A574']} style={styles.topStripe}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow}>
-          <Text style={styles.backText}>&#8249; Back</Text>
+          <Text style={styles.backText}>{'< Back'}</Text>
         </TouchableOpacity>
       </LinearGradient>
 

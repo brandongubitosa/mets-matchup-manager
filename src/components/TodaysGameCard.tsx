@@ -97,7 +97,6 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
     return (
       <View style={[styles.container, compact && styles.containerCompact]}>
         <View style={styles.noGameContent}>
-          <Text style={styles.noGameIcon}>📅</Text>
           <Text style={styles.noGameTitle}>No Game Today</Text>
           <Text style={styles.noGameText}>
             {teamName} doesn't have a game scheduled for today.
@@ -785,10 +784,6 @@ const styles = StyleSheet.create({
   noGameContent: {
     alignItems: 'center',
     padding: SPACING.lg,
-  },
-  noGameIcon: {
-    fontSize: 32,
-    marginBottom: SPACING.sm,
   },
   noGameTitle: {
     fontSize: FONT_SIZE.base,
