@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
+import { NO_GAME_SCHEDULED_TODAY } from '../services/mlbApi';
 import { useTodaysGame, useTeamRoster, useGameLineup } from '../hooks';
 import { TodaysGame, Player, LineupPlayer } from '../types';
 import { TeamLogo } from './TeamLogo';
@@ -66,7 +67,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   const [refreshing, setRefreshing] = React.useState(false);
   const handleRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await refetch(true);
     setRefreshing(false);
   }, [refetch]);
   const { batters: myBatters, loading: myRosterLoading } = useTeamRoster(compact ? teamId : 0);
@@ -93,15 +94,41 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
     return <SkeletonGameCard />;
   }
 
-  if (error || !game) {
+  if (error && error !== NO_GAME_SCHEDULED_TODAY) {
+    return (
+      <View style={[styles.container, compact && styles.containerCompact]}>
+        <View style={styles.noGameContent}>
+          <Text style={styles.scheduleErrorTitle}>Couldn&apos;t load schedule</Text>
+          <Text style={styles.scheduleErrorText}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => refetch(true)}
+            style={styles.retryButton}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading schedule"
+          >
+            <Text style={styles.retryText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!game) {
     return (
       <View style={[styles.container, compact && styles.containerCompact]}>
         <View style={styles.noGameContent}>
           <Text style={styles.noGameTitle}>No Game Today</Text>
           <Text style={styles.noGameText}>
-            {teamName} doesn't have a game scheduled for today.
+            {teamName} doesn&apos;t have a game scheduled for today.
           </Text>
-          <TouchableOpacity onPress={refetch} style={styles.retryButton} activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={() => refetch(true)}
+            style={styles.retryButton}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh schedule"
+          >
             <Text style={styles.retryText}>Refresh</Text>
           </TouchableOpacity>
         </View>
@@ -792,6 +819,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   noGameText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  scheduleErrorTitle: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
+  },
+  scheduleErrorText: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',

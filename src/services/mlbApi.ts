@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import axiosRetry from 'axios-retry';
 import {
   Player,
   MatchupStats,
@@ -26,6 +27,7 @@ import {
   TeamBullpenStatus,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
+import { withCacheAndDedupe, invalidateCacheKey } from './apiCache';
 
 const BASE_URL = 'https://statsapi.mlb.com/api/v1';
 const API_TIMEOUT_MS = 10000;
@@ -35,6 +37,20 @@ const api = axios.create({
   timeout: API_TIMEOUT_MS,
 });
 
+axiosRetry(api, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    const status = error.response?.status;
+    if (status === 429) return true;
+    if (status != null && status >= 500) return true;
+    return axiosRetry.isNetworkOrIdempotentRequestError(error);
+  },
+});
+
+/** Returned when the schedule has no game for the team on the requested calendar day. */
+export const NO_GAME_SCHEDULED_TODAY = 'No game scheduled today';
+
 /** Calendar YYYY-MM-DD in the user's local timezone (avoids UTC day-shift from `toISOString()`). */
 export const formatLocalDateYMD = (d: Date): string => {
   const y = d.getFullYear();
@@ -42,6 +58,22 @@ export const formatLocalDateYMD = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+export function invalidateLiveScoresCache(): void {
+  invalidateCacheKey(`liveScores:${formatLocalDateYMD(new Date())}`);
+}
+
+export function invalidateTodaysGameCache(teamId: number): void {
+  invalidateCacheKey(`todaysGame:${teamId}:${formatLocalDateYMD(new Date())}`);
+}
+
+export function invalidateGameLineupCache(gameId: number): void {
+  invalidateCacheKey(`gameLineup:${gameId}`);
+}
+
+export function invalidateTeamRosterCache(teamId: number): void {
+  invalidateCacheKey(`teamRoster:${teamId}`);
+}
 
 const parseLocalYMD = (ymd: string): Date => {
   const [y, m, d] = ymd.split('-').map((x) => parseInt(x, 10));
@@ -225,32 +257,39 @@ export const searchPlayers = async (query: string, teamId?: number): Promise<Api
 };
 
 export const getTeamRoster = async (teamId: number): Promise<ApiResult<RosterPlayer[]>> => {
-  try {
-    const response = await api.get<MLBRosterResponse>(`/teams/${teamId}/roster?rosterType=active`);
-    const roster = response.data?.roster ?? [];
+  return withCacheAndDedupe(
+    `teamRoster:${teamId}`,
+    90_000,
+    async () => {
+      try {
+        const response = await api.get<MLBRosterResponse>(`/teams/${teamId}/roster?rosterType=active`);
+        const roster = response.data?.roster ?? [];
 
-    return {
-      success: true,
-      data: roster.map((r) => {
-        const { firstName, lastName } = parsePlayerName(
-          r.person.fullName,
-          r.person.firstName,
-          r.person.lastName
-        );
         return {
-          id: r.person.id,
-          fullName: r.person.fullName,
-          firstName,
-          lastName,
-          jerseyNumber: r.jerseyNumber,
-          position: r.position,
-          status: r.status,
+          success: true,
+          data: roster.map((r) => {
+            const { firstName, lastName } = parsePlayerName(
+              r.person.fullName,
+              r.person.firstName,
+              r.person.lastName
+            );
+            return {
+              id: r.person.id,
+              fullName: r.person.fullName,
+              firstName,
+              lastName,
+              jerseyNumber: r.jerseyNumber,
+              position: r.position,
+              status: r.status,
+            };
+          }),
         };
-      }),
-    };
-  } catch (error) {
-    return { success: false, error: formatError(error) };
-  }
+      } catch (error) {
+        return { success: false, error: formatError(error) };
+      }
+    },
+    (r) => r.success
+  );
 };
 
 export const getTeamPitchers = async (teamId: number): Promise<RosterPlayer[]> => {
@@ -447,106 +486,118 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
   homeScore?: number;
   awayScore?: number;
 }>> => {
-  try {
-    const today = formatLocalDateYMD(new Date());
-    const response = await api.get(
-      `/schedule?sportId=1&teamId=${teamId}&date=${today}&hydrate=probablePitcher,linescore`
-    );
+  const today = formatLocalDateYMD(new Date());
+  return withCacheAndDedupe(
+    `todaysGame:${teamId}:${today}`,
+    45_000,
+    async () => {
+      try {
+        const response = await api.get(
+          `/schedule?sportId=1&teamId=${teamId}&date=${today}&hydrate=probablePitcher,linescore`
+        );
 
-    const games = response.data?.dates?.[0]?.games;
-    if (!games || games.length === 0) {
-      return { success: false, error: 'No game scheduled today' };
-    }
+        const games = response.data?.dates?.[0]?.games;
+        if (!games || games.length === 0) {
+          return { success: false, error: NO_GAME_SCHEDULED_TODAY };
+        }
 
-    const game = games[0];
-    const isHome = game.teams.home.team.id === teamId;
-    const opponent = isHome ? game.teams.away.team : game.teams.home.team;
+        const game = games[0];
+        const isHome = game.teams.home.team.id === teamId;
+        const opponent = isHome ? game.teams.away.team : game.teams.home.team;
 
-    // Extract probable pitchers for both teams
-    const opposingTeamData = isHome ? game.teams.away : game.teams.home;
-    const myTeamData = isHome ? game.teams.home : game.teams.away;
-    const probablePitcherData = opposingTeamData?.probablePitcher;
-    const myProbablePitcherData = myTeamData?.probablePitcher;
+        const opposingTeamData = isHome ? game.teams.away : game.teams.home;
+        const myTeamData = isHome ? game.teams.home : game.teams.away;
+        const probablePitcherData = opposingTeamData?.probablePitcher;
+        const myProbablePitcherData = myTeamData?.probablePitcher;
 
-    // Game status
-    const abstractState: string = game.status?.abstractGameState ?? 'Preview';
-    const detailedState: string = game.status?.detailedState ?? '';
-    let status: 'Preview' | 'Live' | 'Final' | 'Postponed' | 'Delayed' | 'Cancelled';
-    if (abstractState === 'Final' || detailedState === 'Final' || detailedState === 'Game Over' || detailedState === 'Completed Early') {
-      status = 'Final';
-    } else if (abstractState === 'Live' || detailedState === 'In Progress') {
-      status = 'Live';
-    } else if (detailedState === 'Postponed') {
-      status = 'Postponed';
-    } else if (detailedState.includes('Delay') || detailedState.includes('Suspended')) {
-      status = 'Delayed';
-    } else if (detailedState === 'Cancelled') {
-      status = 'Cancelled';
-    } else {
-      status = 'Preview';
-    }
+        const abstractState: string = game.status?.abstractGameState ?? 'Preview';
+        const detailedState: string = game.status?.detailedState ?? '';
+        let status: 'Preview' | 'Live' | 'Final' | 'Postponed' | 'Delayed' | 'Cancelled';
+        if (abstractState === 'Final' || detailedState === 'Final' || detailedState === 'Game Over' || detailedState === 'Completed Early') {
+          status = 'Final';
+        } else if (abstractState === 'Live' || detailedState === 'In Progress') {
+          status = 'Live';
+        } else if (detailedState === 'Postponed') {
+          status = 'Postponed';
+        } else if (detailedState.includes('Delay') || detailedState.includes('Suspended')) {
+          status = 'Delayed';
+        } else if (detailedState === 'Cancelled') {
+          status = 'Cancelled';
+        } else {
+          status = 'Preview';
+        }
 
-    const homeScore = typeof game.teams.home.score === 'number' ? game.teams.home.score
-      : game.linescore?.teams?.home?.runs ?? undefined;
-    const awayScore = typeof game.teams.away.score === 'number' ? game.teams.away.score
-      : game.linescore?.teams?.away?.runs ?? undefined;
+        const homeScore = typeof game.teams.home.score === 'number' ? game.teams.home.score
+          : game.linescore?.teams?.home?.runs ?? undefined;
+        const awayScore = typeof game.teams.away.score === 'number' ? game.teams.away.score
+          : game.linescore?.teams?.away?.runs ?? undefined;
 
-    return {
-      success: true,
-      data: {
-        gameId: game.gamePk,
-        homeTeam: {
-          id: game.teams.home.team.id,
-          name: game.teams.home.team.name,
-        },
-        awayTeam: {
-          id: game.teams.away.team.id,
-          name: game.teams.away.team.name,
-        },
-        gameTime: game.gameDate,
-        isHome,
-        opponent: {
-          id: opponent.id,
-          name: opponent.name,
-        },
-        probablePitcher: probablePitcherData?.id
-          ? { id: probablePitcherData.id, fullName: probablePitcherData.fullName }
-          : undefined,
-        myProbablePitcher: myProbablePitcherData?.id
-          ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName, pitchHand: myProbablePitcherData.pitchHand?.code as string | undefined }
-          : undefined,
-        status,
-        homeScore,
-        awayScore,
-      },
-    };
-  } catch (error) {
-    return { success: false, error: formatError(error) };
-  }
+        return {
+          success: true,
+          data: {
+            gameId: game.gamePk,
+            homeTeam: {
+              id: game.teams.home.team.id,
+              name: game.teams.home.team.name,
+            },
+            awayTeam: {
+              id: game.teams.away.team.id,
+              name: game.teams.away.team.name,
+            },
+            gameTime: game.gameDate,
+            isHome,
+            opponent: {
+              id: opponent.id,
+              name: opponent.name,
+            },
+            probablePitcher: probablePitcherData?.id
+              ? { id: probablePitcherData.id, fullName: probablePitcherData.fullName }
+              : undefined,
+            myProbablePitcher: myProbablePitcherData?.id
+              ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName, pitchHand: myProbablePitcherData.pitchHand?.code as string | undefined }
+              : undefined,
+            status,
+            homeScore,
+            awayScore,
+          },
+        };
+      } catch (error) {
+        return { success: false, error: formatError(error) };
+      }
+    },
+    (r) => r.success || r.error === NO_GAME_SCHEDULED_TODAY
+  );
 };
 
 // Get opposing starting pitcher for a game
 export const getOpposingPitcherForTeam = async (gameId: number, teamId: number): Promise<ApiResult<Player>> => {
-  try {
-    const response = await api.get(`/game/${gameId}/boxscore`);
-    const teams = response.data?.teams;
+  return withCacheAndDedupe(
+    `oppPitcher:${gameId}:${teamId}`,
+    30_000,
+    async () => {
+      try {
+        const response = await api.get(`/game/${gameId}/boxscore`);
+        const teams = response.data?.teams;
 
-    if (!teams) {
-      return { success: false, error: 'Could not load game data' };
-    }
+        if (!teams) {
+          return { success: false, error: 'Could not load game data' };
+        }
 
-    const isHome = teams.home?.team?.id === teamId;
-    const opposingTeam = isHome ? teams.away : teams.home;
+        const isHome = teams.home?.team?.id === teamId;
+        const opposingTeam = isHome ? teams.away : teams.home;
 
-    const startingPitcherId = opposingTeam?.pitchers?.[0];
-    if (!startingPitcherId) {
-      return { success: false, error: 'Starting pitcher not available yet' };
-    }
+        const startingPitcherId = opposingTeam?.pitchers?.[0];
+        if (!startingPitcherId) {
+          return { success: false, error: 'Starting pitcher not available yet' };
+        }
 
-    return getPlayerDetails(startingPitcherId);
-  } catch (error) {
-    return { success: false, error: formatError(error) };
-  }
+        return getPlayerDetails(startingPitcherId);
+      } catch (error) {
+        return { success: false, error: formatError(error) };
+      }
+    },
+    (r) => r.success
+  );
 };
 
 // Legacy: Get opposing starting pitcher for today's game (Mets)
@@ -1431,76 +1482,83 @@ export const getTeamBullpenFatigue = async (
 // ─── Live Scores ─────────────────────────────────────────────────────────────
 
 export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
-  try {
-    const today = formatLocalDateYMD(new Date());
-    const response = await api.get(
-      `/schedule?sportId=1&date=${today}&hydrate=linescore,team,probablePitcher`
-    );
+  const today = formatLocalDateYMD(new Date());
+  return withCacheAndDedupe(
+    `liveScores:${today}`,
+    12_000,
+    async () => {
+      try {
+        const response = await api.get(
+          `/schedule?sportId=1&date=${today}&hydrate=linescore,team,probablePitcher`
+        );
 
-    const dates = response.data?.dates;
-    if (!dates || dates.length === 0) {
-      return { success: true, data: [] };
-    }
+        const dates = response.data?.dates;
+        if (!dates || dates.length === 0) {
+          return { success: true, data: [] };
+        }
 
-    interface ScheduleGame {
-      gamePk: number;
-      gameDate: string;
-      status: { abstractGameState: string; detailedState: string; statusCode: string };
-      teams: {
-        home: {
-          team: { id: number; name: string };
-          score?: number;
-          probablePitcher?: { id: number; fullName: string };
-        };
-        away: {
-          team: { id: number; name: string };
-          score?: number;
-          probablePitcher?: { id: number; fullName: string };
-        };
-      };
-      linescore?: {
-        currentInning?: number;
-        currentInningOrdinal?: string;
-        isTopInning?: boolean;
-        outs?: number;
-        teams?: {
-          home?: { runs?: number; hits?: number; errors?: number };
-          away?: { runs?: number; hits?: number; errors?: number };
-        };
-      };
-    }
+        interface ScheduleGame {
+          gamePk: number;
+          gameDate: string;
+          status: { abstractGameState: string; detailedState: string; statusCode: string };
+          teams: {
+            home: {
+              team: { id: number; name: string };
+              score?: number;
+              probablePitcher?: { id: number; fullName: string };
+            };
+            away: {
+              team: { id: number; name: string };
+              score?: number;
+              probablePitcher?: { id: number; fullName: string };
+            };
+          };
+          linescore?: {
+            currentInning?: number;
+            currentInningOrdinal?: string;
+            isTopInning?: boolean;
+            outs?: number;
+            teams?: {
+              home?: { runs?: number; hits?: number; errors?: number };
+              away?: { runs?: number; hits?: number; errors?: number };
+            };
+          };
+        }
 
-    const games: LiveGame[] = (dates[0].games as ScheduleGame[]).map((g) => {
-      const ls = g.linescore;
-      return {
-        gamePk: g.gamePk,
-        gameDate: g.gameDate,
-        status: g.status,
-        homeTeam: { id: g.teams.home.team.id, name: g.teams.home.team.name },
-        awayTeam: { id: g.teams.away.team.id, name: g.teams.away.team.name },
-        homeScore: ls?.teams?.home?.runs ?? g.teams.home.score ?? 0,
-        awayScore: ls?.teams?.away?.runs ?? g.teams.away.score ?? 0,
-        homeHits: ls?.teams?.home?.hits ?? 0,
-        awayHits: ls?.teams?.away?.hits ?? 0,
-        homeErrors: ls?.teams?.home?.errors ?? 0,
-        awayErrors: ls?.teams?.away?.errors ?? 0,
-        currentInning: ls?.currentInning ?? null,
-        currentInningOrdinal: ls?.currentInningOrdinal ?? null,
-        inningHalf: ls?.isTopInning === true ? 'top' : ls?.isTopInning === false ? 'bottom' : null,
-        outs: ls?.outs ?? null,
-        homeProbablePitcher: g.teams.home.probablePitcher?.id
-          ? { id: g.teams.home.probablePitcher.id, fullName: g.teams.home.probablePitcher.fullName }
-          : undefined,
-        awayProbablePitcher: g.teams.away.probablePitcher?.id
-          ? { id: g.teams.away.probablePitcher.id, fullName: g.teams.away.probablePitcher.fullName }
-          : undefined,
-      };
-    });
+        const games: LiveGame[] = (dates[0].games as ScheduleGame[]).map((g) => {
+          const ls = g.linescore;
+          return {
+            gamePk: g.gamePk,
+            gameDate: g.gameDate,
+            status: g.status,
+            homeTeam: { id: g.teams.home.team.id, name: g.teams.home.team.name },
+            awayTeam: { id: g.teams.away.team.id, name: g.teams.away.team.name },
+            homeScore: ls?.teams?.home?.runs ?? g.teams.home.score ?? 0,
+            awayScore: ls?.teams?.away?.runs ?? g.teams.away.score ?? 0,
+            homeHits: ls?.teams?.home?.hits ?? 0,
+            awayHits: ls?.teams?.away?.hits ?? 0,
+            homeErrors: ls?.teams?.home?.errors ?? 0,
+            awayErrors: ls?.teams?.away?.errors ?? 0,
+            currentInning: ls?.currentInning ?? null,
+            currentInningOrdinal: ls?.currentInningOrdinal ?? null,
+            inningHalf: ls?.isTopInning === true ? 'top' : ls?.isTopInning === false ? 'bottom' : null,
+            outs: ls?.outs ?? null,
+            homeProbablePitcher: g.teams.home.probablePitcher?.id
+              ? { id: g.teams.home.probablePitcher.id, fullName: g.teams.home.probablePitcher.fullName }
+              : undefined,
+            awayProbablePitcher: g.teams.away.probablePitcher?.id
+              ? { id: g.teams.away.probablePitcher.id, fullName: g.teams.away.probablePitcher.fullName }
+              : undefined,
+          };
+        });
 
-    return { success: true, data: games };
-  } catch (error) {
-    return { success: false, error: formatError(error) };
-  }
+        return { success: true, data: games };
+      } catch (error) {
+        return { success: false, error: formatError(error) };
+      }
+    },
+    (r) => r.success
+  );
 };
 
 // ─── Game Prediction ────────────────────────────────────────────────────────
@@ -1984,16 +2042,18 @@ const extractLineupFromSide = (players: Record<string, {
 export const getGameLineup = async (
   gameId: number
 ): Promise<{ home: LineupPlayer[]; away: LineupPlayer[] }> => {
-  try {
-    const res = await api.get(`/game/${gameId}/boxscore`);
-    const teams = res.data?.teams;
-    return {
-      home: teams?.home?.players ? extractLineupFromSide(teams.home.players) : [],
-      away: teams?.away?.players ? extractLineupFromSide(teams.away.players) : [],
-    };
-  } catch {
-    return { home: [], away: [] };
-  }
+  return withCacheAndDedupe(`gameLineup:${gameId}`, 45_000, async () => {
+    try {
+      const res = await api.get(`/game/${gameId}/boxscore`);
+      const teams = res.data?.teams;
+      return {
+        home: teams?.home?.players ? extractLineupFromSide(teams.home.players) : [],
+        away: teams?.away?.players ? extractLineupFromSide(teams.away.players) : [],
+      };
+    } catch {
+      return { home: [], away: [] };
+    }
+  });
 };
 
 export const getTeamPitchingStats = async (teamId: number): Promise<TeamStaffStats | null> => {

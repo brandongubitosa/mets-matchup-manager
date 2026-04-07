@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +13,7 @@ import { RouteProp } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { PlayerCard, TeamPicker, SearchBar, StepIndicator, SkeletonPlayerList, AnimatedCard } from '../components';
 import { RosterPlayer, RootStackParamList, BatterMatchupScreenNavigationProp } from '../types';
-import { getTeamBatters, getTeamPitchers } from '../services/mlbApi';
+import { getTeamBatters, getTeamPitchers, invalidateTeamRosterCache } from '../services/mlbApi';
 
 type BatterMatchupScreenProps = {
   navigation: BatterMatchupScreenNavigationProp;
@@ -35,8 +36,25 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingPitchers, setLoadingPitchers] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const flowBase = { teamId, teamName, opponentTeamId, opponentTeamName };
+
+  const onRefreshRosters = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      invalidateTeamRosterCache(teamId);
+      const batters = await getTeamBatters(teamId);
+      setMetsBatters(batters);
+      if (selectedTeamId) {
+        invalidateTeamRosterCache(selectedTeamId);
+        const pitchers = await getTeamPitchers(selectedTeamId);
+        setOpposingPitchers(pitchers);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [teamId, selectedTeamId]);
 
   useEffect(() => {
     if (clearBatter) {
@@ -157,6 +175,9 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefreshRosters} tintColor={COLORS.primary} />
+            }
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard
@@ -224,6 +245,9 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefreshRosters} tintColor={COLORS.primary} />
+            }
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard

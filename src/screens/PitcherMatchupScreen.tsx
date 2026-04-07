@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +13,7 @@ import { RouteProp } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { PlayerCard, TeamPicker, SearchBar, StepIndicator, SkeletonPlayerList, AnimatedCard } from '../components';
 import { RosterPlayer, RootStackParamList, PitcherMatchupScreenNavigationProp } from '../types';
-import { getTeamPitchers, getTeamBatters } from '../services/mlbApi';
+import { getTeamPitchers, getTeamBatters, invalidateTeamRosterCache } from '../services/mlbApi';
 
 type PitcherMatchupScreenProps = {
   navigation: PitcherMatchupScreenNavigationProp;
@@ -35,8 +36,25 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingBatters, setLoadingBatters] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const flowBase = { teamId, teamName, opponentTeamId, opponentTeamName };
+
+  const onRefreshRosters = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      invalidateTeamRosterCache(teamId);
+      const pitchers = await getTeamPitchers(teamId);
+      setMetsPitchers(pitchers);
+      if (selectedTeamId) {
+        invalidateTeamRosterCache(selectedTeamId);
+        const batters = await getTeamBatters(selectedTeamId);
+        setOpposingBatters(batters);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [teamId, selectedTeamId]);
 
   useEffect(() => {
     if (clearPitcher) {
@@ -156,6 +174,9 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefreshRosters} tintColor={COLORS.primary} />
+            }
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard
@@ -223,6 +244,9 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefreshRosters} tintColor={COLORS.primary} />
+            }
             renderItem={({ item, index }) => (
               <AnimatedCard delay={index * 40}>
                 <PlayerCard

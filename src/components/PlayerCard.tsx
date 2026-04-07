@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
+import { lightImpact } from '../utils/haptics';
 import { Player, RosterPlayer } from '../types';
 
 interface PlayerCardProps {
@@ -47,13 +48,23 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
     return (
       <TouchableOpacity
-        onPress={onPress}
+        onPress={
+          onPress
+            ? () => {
+                lightImpact();
+                onPress();
+              }
+            : undefined
+        }
         activeOpacity={0.85}
         style={[
           styles.cardWrapper,
           selected && styles.cardWrapperSelected,
           Platform.OS === 'web' ? { cursor: 'pointer' as unknown as undefined } : {},
         ]}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={onPress ? player.fullName : undefined}
+        accessibilityState={onPress ? { selected } : undefined}
       >
         <LinearGradient colors={cardColors} style={styles.cardGradient}>
           {/* Top row: jersey + position */}
@@ -128,8 +139,18 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         { borderLeftColor: accent },
         Platform.OS === 'web' ? { cursor: 'pointer' as unknown as undefined } : {},
       ]}
-      onPress={onPress}
+      onPress={
+        onPress
+          ? () => {
+              lightImpact();
+              onPress();
+            }
+          : undefined
+      }
       activeOpacity={0.7}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? player.fullName : undefined}
+      accessibilityState={onPress ? { selected } : undefined}
     >
       <View style={styles.listPhotoContainer}>
         {!imageError ? (

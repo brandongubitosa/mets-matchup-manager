@@ -1,13 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TodaysGame, Player } from '../types';
-import { getTodaysGameForTeam, getOpposingPitcherForTeam } from '../services/mlbApi';
+import {
+  getTodaysGameForTeam,
+  getOpposingPitcherForTeam,
+  invalidateTodaysGameCache,
+  invalidateGameLineupCache,
+  invalidateTeamRosterCache,
+} from '../services/mlbApi';
 
 interface UseTodaysGameReturn {
   game: TodaysGame | null;
   opposingPitcher: Player | null;
   loading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: (forceRefresh?: boolean) => Promise<void>;
 }
 
 export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
@@ -16,9 +22,13 @@ export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGame = useCallback(async () => {
+  const fetchGame = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
+    if (forceRefresh) {
+      invalidateTodaysGameCache(teamId);
+      invalidateTeamRosterCache(teamId);
+    }
 
     const gameResult = await getTodaysGameForTeam(teamId);
 
@@ -31,6 +41,12 @@ export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
     }
 
     setGame(gameResult.data);
+    if (forceRefresh) {
+      if (gameResult.data.gameId) {
+        invalidateGameLineupCache(gameResult.data.gameId);
+      }
+      invalidateTeamRosterCache(gameResult.data.opponent.id);
+    }
 
     // Use probable pitcher from schedule hydrate if available, else fall back to boxscore
     if (gameResult.data.probablePitcher) {
@@ -56,7 +72,7 @@ export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
   }, [teamId]);
 
   useEffect(() => {
-    fetchGame();
+    fetchGame(false);
   }, [fetchGame]);
 
   return {
@@ -64,6 +80,6 @@ export const useTodaysGame = (teamId: number): UseTodaysGameReturn => {
     opposingPitcher,
     loading,
     error,
-    refetch: fetchGame,
+    refetch: (forceRefresh = true) => fetchGame(forceRefresh),
   };
 };

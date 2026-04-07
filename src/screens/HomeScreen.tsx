@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   TextInput,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -143,6 +145,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <AnimatedCard
             delay={60}
             style={styles.quickBoxWrapper}
+            accessibilityLabel="Open live scoreboard"
+            accessibilityHint="Shows today games and scores"
             onPress={() => navigation.navigate('LiveScores', { highlightTeamId: selectedTeam.id })}
           >
             <LinearGradient
@@ -164,6 +168,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <AnimatedCard
             delay={110}
             style={styles.quickBoxWrapper}
+            accessibilityLabel="Open batter matchups"
+            accessibilityHint="Pick a batter and opposing pitcher to view stats"
             onPress={() =>
               navigation.navigate('BatterMatchup', {
                 teamId: selectedTeam.id,
@@ -186,6 +192,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <AnimatedCard
             delay={160}
             style={styles.quickBoxWrapper}
+            accessibilityLabel="Open pitcher matchups"
+            accessibilityHint="Pick a pitcher and opposing batter to view stats"
             onPress={() =>
               navigation.navigate('PitcherMatchup', {
                 teamId: selectedTeam.id,
@@ -207,8 +215,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       {/* ── Team Picker Modal ── */}
-      <Modal visible={showPicker} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+      <Modal visible={showPicker} animationType="slide" transparent accessibilityViewIsModal>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalKeyboardRoot}
+        >
+          <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
@@ -273,6 +285,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -394,6 +407,9 @@ const styles = StyleSheet.create({
   },
 
   // ── Team Picker Modal ────────────────────────────────────────────────────
+  modalKeyboardRoot: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.overlay,
