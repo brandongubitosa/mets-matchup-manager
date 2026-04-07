@@ -37,19 +37,22 @@ interface FieldHalfProps {
  * https://en.wikipedia.org/wiki/Baseball_field — diagrammatic sector matches common vectors.
  */
 const BaseballFieldSvg: React.FC = () => {
-  const uid = useId().replace(/:/g, '');
+  /** SVG id must be valid in HTML; useId() can emit characters that break url(#…) on web */
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '') || 'g';
   const ofg = `${uid}-of`;
   const ifg = `${uid}-if`;
 
-  const R = 56;
   const HOME = { x: 50, y: 88 };
-  const k = R / Math.SQRT2;
+  /** 90° sector endpoints (same geometry as R=56 circular arc, without buggy SVG A on RN-web) */
+  const k = 56 / Math.SQRT2;
   const fenceL = { x: HOME.x - k, y: HOME.y - k };
   const fenceR = { x: HOME.x + k, y: HOME.y - k };
+  /** Quadratic control — CF “peak”; reads like stock diagrams, stable across web/native */
+  const fenceC = { x: 50, y: 28 };
 
-  const fairSectorPath = `M ${HOME.x} ${HOME.y} L ${fenceL.x} ${fenceL.y} A ${R} ${R} 0 0 0 ${fenceR.x} ${fenceR.y} Z`;
+  const fairSectorPath = `M ${HOME.x} ${HOME.y} L ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y} Z`;
 
-  const outfieldGrassPath = `M ${fenceL.x} ${fenceL.y} A ${R} ${R} 0 0 0 ${fenceR.x} ${fenceR.y} L ${HOME.x} ${HOME.y - 22} Z`;
+  const outfieldGrassPath = `M ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y} L ${HOME.x} ${HOME.y - 22} Z`;
 
   const B2 = { x: 50, y: 54 };
   const B1 = { x: 68, y: 69 };
@@ -113,9 +116,9 @@ const BaseballFieldSvg: React.FC = () => {
         strokeLinecap="round"
       />
 
-      {/* Fence arc stroke */}
+      {/* Fence curve (quadratic, matches fair sector) */}
       <Path
-        d={`M ${fenceL.x} ${fenceL.y} A ${R} ${R} 0 0 0 ${fenceR.x} ${fenceR.y}`}
+        d={`M ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y}`}
         fill="none"
         stroke="rgba(20, 35, 22, 0.55)"
         strokeWidth="0.7"
@@ -256,9 +259,23 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: VB_W / VB_H,
     position: 'relative',
+    ...Platform.select({
+      web: {
+        // RN-web: percentage height inside flex/ScrollView can collapse; aspectRatio still sets height from width
+        display: 'block',
+        minHeight: 1,
+      },
+      default: {},
+    }),
   },
   svgLayer: {
     ...StyleSheet.absoluteFillObject,
+    ...Platform.select({
+      web: {
+        display: 'block',
+      },
+      default: {},
+    }),
   },
   slot: {
     position: 'absolute',
