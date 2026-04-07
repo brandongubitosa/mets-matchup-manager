@@ -17,7 +17,8 @@ const SLOT_COORDS: { key: string; x: number; y: number }[] = [
   { key: '2B', x: 50, y: 24 },
   { key: '1B', x: 70, y: 46 },
   { key: 'P', x: 50, y: 42 },
-  { key: 'C', x: 50, y: 74 },
+  /** Above home plate so the label does not cover the pentagon (plate ~y 71–79 in viewBox) */
+  { key: 'C', x: 50, y: 54 },
   { key: 'DH', x: 12, y: 82 },
 ];
 
@@ -42,79 +43,113 @@ const BaseballFieldSvg: React.FC = () => (
     preserveAspectRatio="xMidYMid meet"
   >
     <Defs>
-      <LinearGradient id="grassGrad" x1="0" y1="0" x2="0" y2="1">
-        <Stop offset="0" stopColor="#3d7a4a" />
-        <Stop offset="0.45" stopColor="#356f42" />
-        <Stop offset="1" stopColor="#2d5a36" />
+      {/* Outfield: lusher, brighter grass */}
+      <LinearGradient id="outfieldGrassGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+        <Stop offset="0" stopColor="#4f9a5e" />
+        <Stop offset="0.55" stopColor="#3d7a4a" />
+        <Stop offset="1" stopColor="#2f5c38" />
       </LinearGradient>
-      <LinearGradient id="outfieldGrad" x1="0.5" y1="0" x2="0.5" y2="1">
-        <Stop offset="0" stopColor="#4a8f58" stopOpacity="0.95" />
-        <Stop offset="1" stopColor="#356f42" stopOpacity="0" />
+      {/* Infield fair territory: grass, but flatter / less vivid than OF */}
+      <LinearGradient id="infieldGrassGrad" x1="0.5" y1="0.35" x2="0.5" y2="1">
+        <Stop offset="0" stopColor="#3d6844" />
+        <Stop offset="1" stopColor="#335a3a" />
       </LinearGradient>
     </Defs>
 
-    {/* Full grass */}
-    <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#grassGrad)" />
+    {/* Base: infield-style grass (full canvas) — less saturated than outfield overlay */}
+    <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#infieldGrassGrad)" />
 
-    {/* Outfield “fence” arc (subtle) */}
+    {/* Outfield arc — noticeably greener than infield */}
     <Path
-      d="M 4 18 Q 50 -2 96 18 L 96 92 L 4 92 Z"
-      fill="url(#outfieldGrad)"
-      opacity={0.45}
+      d="M 2 20 Q 50 -4 98 20 L 98 92 L 2 92 Z"
+      fill="url(#outfieldGrassGrad)"
+      opacity={0.92}
+    />
+
+    {/* Fair wedge: subtle infield grass tint (less vivid than outfield arc above) */}
+    <Path
+      d="M 6 12 L 50 72 L 94 12 L 94 92 L 6 92 Z"
+      fill="#3a5f40"
+      opacity={0.18}
+    />
+
+    {/* Skinned dirt: basepaths + home area (dirt dominant; grass shows around the wedge edges) */}
+    {/* Wide dirt from 3B side toward home */}
+    <Path
+      d="M 29 46 L 50 22 L 50 70 L 38 76 L 26 52 Z"
+      fill="#d4b896"
+      opacity={0.95}
+    />
+    {/* Wide dirt from 1B corner toward home */}
+    <Path
+      d="M 71 46 L 50 22 L 50 70 L 62 76 L 74 52 Z"
+      fill="#d4b896"
+      opacity={0.95}
+    />
+    {/* Skinned cutout around home */}
+    <Path
+      d="M 38 76 Q 50 82 62 76 L 62 72 Q 50 68 38 72 Z"
+      fill="#d4b896"
+    />
+    {/* Inner diamond (bases) */}
+    <Path
+      d="M 50 22 L 71 46 L 50 70 L 29 46 Z"
+      fill="#d4b896"
+      stroke="rgba(160,125,80,0.4)"
+      strokeWidth="0.35"
     />
 
     {/* Foul lines (from home toward foul poles) */}
     <Line
       x1="50"
-      y1="71"
+      y1="72"
       x2="6"
       y2="10"
-      stroke="rgba(255,255,255,0.88)"
+      stroke="rgba(255,255,255,0.9)"
       strokeWidth="0.55"
       strokeLinecap="round"
     />
     <Line
       x1="50"
-      y1="71"
+      y1="72"
       x2="94"
       y2="10"
-      stroke="rgba(255,255,255,0.88)"
+      stroke="rgba(255,255,255,0.9)"
       strokeWidth="0.55"
       strokeLinecap="round"
     />
 
-    {/* Infield dirt — square between bases (rotated diamond) */}
-    <Path
-      d="M 50 22 L 71 46 L 50 70 L 29 46 Z"
-      fill="#d4b896"
-      stroke="rgba(180,140,90,0.5)"
-      strokeWidth="0.35"
-    />
-
-    {/* Baselines along dirt diamond */}
+    {/* Baselines on dirt */}
     <Path
       d="M 50 22 L 71 46 M 71 46 L 50 70 M 50 70 L 29 46 M 29 46 L 50 22"
-      stroke="rgba(255,255,255,0.75)"
+      stroke="rgba(255,255,255,0.78)"
       strokeWidth="0.45"
       fill="none"
     />
 
     {/* Pitcher’s mound */}
-    <Circle cx="50" cy="42" r="3.2" fill="#c9a574" stroke="rgba(255,255,255,0.4)" strokeWidth="0.25" />
+    <Circle cx="50" cy="42" r="3.2" fill="#b89560" stroke="rgba(255,255,255,0.45)" strokeWidth="0.28" />
 
-    {/* Second base bag (small) */}
-    <Circle cx="50" cy="24" r="1.2" fill="#f5f0e6" opacity={0.9} />
+    {/* Second base bag */}
+    <Circle cx="50" cy="24" r="1.2" fill="#f5f0e6" opacity={0.95} />
 
-    {/* Home plate + batter’s boxes hint */}
-    <Path
-      d="M 50 71 L 52 74 L 50 76 L 48 74 Z"
-      fill="#f8f4ec"
-      stroke="rgba(255,255,255,0.6)"
-      strokeWidth="0.2"
-    />
-
-    {/* Dugout / bench strip for context */}
+    {/* Dugout / bench strip */}
     <Rect x="4" y="78" width="18" height="10" rx="1" fill="rgba(0,0,0,0.12)" />
+
+    {/* Home plate — pentagon, large and high-contrast (drawn last so it stays visible) */}
+    <Path
+      d="M 44 71.5 L 56 71.5 L 56.5 74.8 L 50 79.5 L 43.5 74.8 Z"
+      fill="#f2ebe0"
+      stroke="#5c4a32"
+      strokeWidth="0.5"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M 45 72.2 L 55 72.2 L 55.2 74.5 L 50 78.2 L 44.8 74.5 Z"
+      fill="none"
+      stroke="rgba(255,255,255,0.65)"
+      strokeWidth="0.22"
+    />
   </Svg>
 );
 

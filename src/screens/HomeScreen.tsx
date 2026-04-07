@@ -13,11 +13,15 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
 import { usePersistedTeam, useResponsiveLayout } from '../hooks';
+import { getLiveScores } from '../services/mlbApi';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
+
+const HOME_LIVE_POLL_MS = 30_000;
 
 type HomeScreenProps = {
   navigation: HomeScreenNavigationProp;
@@ -28,8 +32,10 @@ const teamList = Object.entries(MLB_TEAMS)
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const isFocused = useIsFocused();
   const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
   const { isTablet } = useResponsiveLayout();
+  const [hasLiveGames, setHasLiveGames] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [teamSearch, setTeamSearch] = useState('');
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -41,6 +47,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
   }, [logoScale, logoOpacity]);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let cancelled = false;
+
+    const tick = async () => {
+      const result = await getLiveScores();
+      if (cancelled || !result.success) return;
+      setHasLiveGames(result.data.some((g) => g.status.abstractGameState === 'Live'));
+    };
+
+    tick();
+    const id = setInterval(tick, HOME_LIVE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [isFocused]);
 
   const filteredTeams = teamSearch
     ? teamList.filter(
@@ -145,7 +169,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <AnimatedCard
             delay={60}
             style={styles.quickBoxWrapper}
-            accessibilityLabel="Open live scoreboard"
+            accessibilityLabel={
+              hasLiveGames ? 'Open live scoreboard, games in progress' : 'Open live scoreboard'
+            }
             accessibilityHint="Shows today games and scores"
             onPress={() => navigation.navigate('LiveScores', { highlightTeamId: selectedTeam.id })}
           >
@@ -155,10 +181,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveBadgeText}>LIVE</Text>
-              </View>
+              {hasLiveGames ? (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveBadgeText}>LIVE</Text>
+                </View>
+              ) : null}
               <Text style={styles.quickBoxTitle}>Scoreboard</Text>
               <Text style={styles.quickBoxArrow}>›</Text>
             </LinearGradient>
