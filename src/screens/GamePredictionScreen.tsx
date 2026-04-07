@@ -278,7 +278,7 @@ const LineupRow: React.FC<{ item: BatterPredictionItem; rank: number; onPress?: 
       {form && (
         <View style={[lineupStyles.formBadge, { backgroundColor: form === 'hot' ? `${COLORS.danger}20` : `${COLORS.primary}15` }]}>
           <Text style={[lineupStyles.formText, { color: form === 'hot' ? COLORS.danger : COLORS.primary }]}>
-            {form === 'hot' ? '🔥' : '❄️'}
+            {form === 'hot' ? 'Hot' : 'Cold'}
           </Text>
         </View>
       )}
@@ -460,7 +460,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>‹ Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Game Prediction</Text>
           <Text style={styles.headerSubtitle}>{awayAbbr} @ {homeAbbr}</Text>
@@ -481,11 +481,11 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>‹ Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
         </LinearGradient>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <Text style={styles.errorIcon}>!</Text>
           <Text style={styles.errorText}>{error ?? 'Something went wrong'}</Text>
           <View style={styles.errorButtons}>
             <TouchableOpacity style={styles.retryBtn} onPress={() => setRetryKey(k => k + 1)}>
@@ -520,7 +520,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           style={styles.header}
         >
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>‹ Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Game Prediction</Text>
@@ -551,7 +551,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
                 </View>
                 <View style={styles.liveInningBlock}>
                   <Text style={styles.liveInningHalf}>
-                    {liveGameState.inningHalf === 'top' ? '▲' : '▼'}
+                    {liveGameState.inningHalf === 'top' ? 'Top' : 'Bot'}
                   </Text>
                   <Text style={styles.liveInningNum}>{liveGameState.inning}</Text>
                 </View>
@@ -838,7 +838,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
           onPress={() => navigation.goBack()}
           activeOpacity={0.8}
         >
-          <Text style={styles.backButtonText}>← Back to Home</Text>
+          <Text style={styles.backButtonText}>{'< Back to Home'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

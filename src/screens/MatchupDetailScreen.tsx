@@ -169,7 +169,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>&#8249; Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
           <Text style={styles.loadingHeaderText}>Loading matchup...</Text>
         </LinearGradient>
@@ -184,11 +184,11 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>&#8249; Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
         </LinearGradient>
         <View style={styles.errorContainer} accessibilityRole="alert">
-          <Text style={styles.errorIcon}>&#9888;&#65039;</Text>
+          <Text style={styles.errorIcon}>!</Text>
           <Text style={styles.errorText}>{error || 'Something went wrong'}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.retryBtnText}>Go Back</Text>
@@ -220,7 +220,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           style={styles.header}
         >
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>&#8249; Back</Text>
+            <Text style={styles.backBtnText}>{'< Back'}</Text>
           </TouchableOpacity>
 
           <View style={styles.vsContainer}>
@@ -468,7 +468,6 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
         {stats.atBats === 0 && (
           <AnimatedCard delay={200}>
             <View style={styles.noDataContainer}>
-              <Text style={styles.noDataIcon}>&#128202;</Text>
               <Text style={styles.noDataTitle}>No Previous Matchups</Text>
               <Text style={styles.noDataText}>
                 These players haven't faced each other in recorded MLB history.
@@ -483,7 +482,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           onPress={() => navigation.goBack()}
           activeOpacity={0.8}
         >
-          <Text style={styles.backButtonText}>&#8592; Select Another Matchup</Text>
+          <Text style={styles.backButtonText}>{'< Select Another Matchup'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -748,10 +747,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     alignItems: 'center',
     ...SHADOW.sm,
-  },
-  noDataIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.md,
   },
   noDataTitle: {
     fontSize: FONT_SIZE.lg,

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
-import { usePersistedTeam } from '../hooks';
+import { usePersistedTeam, useResponsiveLayout } from '../hooks';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
 
 type HomeScreenProps = {
@@ -27,6 +27,7 @@ const teamList = Object.entries(MLB_TEAMS)
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
+  const { isTablet, isDesktop } = useResponsiveLayout();
   const [showPicker, setShowPicker] = useState(false);
   const [teamSearch, setTeamSearch] = useState('');
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -82,12 +83,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           accessibilityRole="button"
           accessibilityLabel="Change team"
         >
-          <Text style={styles.changeTeamText}>Change Team ▼</Text>
+          <Text style={styles.changeTeamText}>Change team</Text>
         </TouchableOpacity>
       </LinearGradient>
 
       {/* ── No-Scroll Content Grid ── */}
-      <View style={styles.content}>
+      <View
+        style={[
+          styles.content,
+          (isTablet || isDesktop) && styles.contentWide,
+        ]}
+      >
         {/* Today's Game — fills available vertical space */}
         <AnimatedCard delay={0} style={styles.gameCardWrapper}>
           <TodaysGameCard
@@ -171,7 +177,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.quickBoxIcon}>💥</Text>
               <Text style={styles.quickBoxTitle}>Batters</Text>
               <Text style={styles.quickBoxArrow}>›</Text>
             </LinearGradient>
@@ -194,7 +199,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.quickBoxIcon}>⚾</Text>
               <Text style={styles.quickBoxTitle}>Pitchers</Text>
               <Text style={styles.quickBoxArrow}>›</Text>
             </LinearGradient>
@@ -213,12 +217,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 onPress={() => { setShowPicker(false); setTeamSearch(''); }}
                 style={styles.modalCloseIcon}
               >
-                <Text style={styles.modalCloseText}>✕</Text>
+                <Text style={styles.modalCloseText}>x</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalSearchContainer}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <Text style={styles.searchIcon}>Search</Text>
               <TextInput
                 style={styles.modalSearchInput}
                 placeholder="Search teams..."
@@ -230,7 +234,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               />
               {teamSearch.length > 0 && (
                 <TouchableOpacity onPress={() => setTeamSearch('')}>
-                  <Text style={styles.searchClear}>✕</Text>
+                  <Text style={styles.searchClear}>x</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -253,7 +257,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       </Text>
                       <Text style={styles.teamOptionAbbr}>{item.abbreviation}</Text>
                     </View>
-                    {isSelected && <Text style={styles.checkIcon}>✓</Text>}
+                    {isSelected && <View style={styles.selectedDot} />}
                   </TouchableOpacity>
                 );
               }}
@@ -322,6 +326,10 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
     gap: SPACING.sm,
   },
+  contentWide: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
   gameCardWrapper: {
     flex: 1,
   },
@@ -342,9 +350,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     overflow: 'hidden',
-  },
-  quickBoxIcon: {
-    fontSize: 20,
   },
   quickBoxTitle: {
     fontSize: FONT_SIZE.sm,
@@ -441,8 +446,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   searchIcon: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.textMuted,
     marginRight: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   modalSearchInput: {
     flex: 1,
@@ -487,9 +496,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.borderLight,
     marginLeft: 60,
   },
-  checkIcon: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.primary,
+  selectedDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
   },
 });

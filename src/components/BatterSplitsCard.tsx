@@ -18,13 +18,6 @@ const SPLIT_LABELS: Record<string, string> = {
   vr: 'vs Right',
 };
 
-const SPLIT_ICONS: Record<string, string> = {
-  h: '🏠',
-  a: '✈️',
-  vl: '⬅️',
-  vr: '➡️',
-};
-
 const getOpsColor = (ops: string): string => {
   const n = parseFloat(ops);
   if (isNaN(n)) return COLORS.textPrimary;
@@ -106,9 +99,6 @@ export const BatterSplitsCard: React.FC<BatterSplitsCardProps> = ({
                     </View>
                   )}
                   <View style={styles.splitNameRow}>
-                    <Text style={styles.splitIcon}>
-                      {SPLIT_ICONS[split.code] ?? ''}
-                    </Text>
                     <Text style={[styles.splitLabel, isHighlighted && styles.splitLabelHighlighted]}>
                       {SPLIT_LABELS[split.code] ?? split.description}
                     </Text>
@@ -268,9 +258,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
-  },
-  splitIcon: {
-    fontSize: 12,
   },
   splitLabel: {
     fontSize: FONT_SIZE.sm,

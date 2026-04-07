@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       return (
         <View style={styles.container} accessibilityRole="alert">
-          <Text style={styles.icon}>⚠️</Text>
+          <Text style={styles.icon}>!</Text>
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>
             {this.state.error?.message || 'An unexpected error occurred'}

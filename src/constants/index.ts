@@ -106,9 +106,23 @@ export const SHADOW: Record<'sm' | 'md' | 'lg', ShadowStyle> = {
   },
 };
 
+/** @deprecated Use getWebMaxContentWidth(windowWidth) for responsive web layout */
 export const WEB_MAX_WIDTH = 480;
 
 export const isWeb = Platform.OS === 'web';
+
+/**
+ * Max width for the centered web column. Scales up on tablets/desktops,
+ * full width on small phone browsers.
+ */
+export const getWebMaxContentWidth = (windowWidth: number): number => {
+  if (windowWidth >= 1536) return 1280;
+  if (windowWidth >= 1280) return 1120;
+  if (windowWidth >= 1024) return 960;
+  if (windowWidth >= 768) return 720;
+  if (windowWidth >= 480) return Math.min(560, windowWidth - 24);
+  return windowWidth;
+};
 
 export const MLB_TEAMS: { [key: number]: { name: string; abbreviation: string } } = {
   108: { name: 'Los Angeles Angels', abbreviation: 'LAA' },

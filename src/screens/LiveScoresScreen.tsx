@@ -275,7 +275,7 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
       >
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} activeOpacity={0.7}>
-            <Text style={styles.backText}>{'\u2039'}</Text>
+            <Text style={styles.backText}>{'< Back'}</Text>
           </TouchableOpacity>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Live Scores</Text>
@@ -316,7 +316,6 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
         </View>
       ) : sortedGames.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>⚾</Text>
           <Text style={styles.emptyTitle}>No Games Today</Text>
           <Text style={styles.emptyText}>Check back on a game day for live scores.</Text>
         </View>
@@ -366,18 +365,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   backText: {
     color: COLORS.white,
-    fontSize: 28,
-    fontWeight: '300',
-    marginTop: -2,
+    fontSize: FONT_SIZE.base,
+    fontWeight: '600',
+    opacity: 0.9,
   },
   headerCenter: {
     flex: 1,
@@ -471,10 +470,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.md,
   },
   emptyTitle: {
     fontSize: FONT_SIZE.lg,

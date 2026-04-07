@@ -132,7 +132,7 @@ export const PitcherMatchupScreen: React.FC<PitcherMatchupScreenProps> = ({ navi
         style={styles.header}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>&#8249; Back</Text>
+          <Text style={styles.backBtnText}>{'< Back'}</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{teamName} Pitchers</Text>
         <Text style={styles.headerSubtitle}>vs. Opposing Batters</Text>

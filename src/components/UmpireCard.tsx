@@ -10,9 +10,9 @@ interface UmpireCardProps {
 }
 
 const TENDENCY_CONFIG = {
-  'pitcher-friendly': { color: '#1D4ED8', bg: '#EFF6FF', icon: '⚾', label: 'Pitcher Friendly' },
-  'hitter-friendly':  { color: '#B45309', bg: '#FFFBEB', icon: '🏏', label: 'Hitter Friendly'  },
-  'neutral':          { color: '#374151', bg: '#F9FAFB', icon: '⚖️', label: 'Average Zone'     },
+  'pitcher-friendly': { color: '#1D4ED8', bg: '#EFF6FF', label: 'Pitcher Friendly' },
+  'hitter-friendly':  { color: '#B45309', bg: '#FFFBEB', label: 'Hitter Friendly' },
+  'neutral':          { color: '#374151', bg: '#F9FAFB', label: 'Average Zone' },
 };
 
 // A simple horizontal progress bar
@@ -52,7 +52,6 @@ export const UmpireCard: React.FC<UmpireCardProps> = ({ stats, loading = false, 
         <>
           {/* Name row */}
           <View style={styles.nameRow}>
-            <Text style={styles.umpireIcon}>👨‍⚖️</Text>
             <View>
               <Text style={styles.umpieName}>{stats.name}</Text>
               <Text style={styles.gamesText}>{stats.games} career games called</Text>
@@ -82,7 +81,6 @@ export const UmpireCard: React.FC<UmpireCardProps> = ({ stats, loading = false, 
 
           {/* Tendency badge */}
           <View style={[styles.tendencyBanner, { backgroundColor: TENDENCY_CONFIG[stats.zoneTendency].bg }]}>
-            <Text style={styles.tendencyIcon}>{TENDENCY_CONFIG[stats.zoneTendency].icon}</Text>
             <View style={styles.tendencyText}>
               <Text style={[styles.tendencyLabel, { color: TENDENCY_CONFIG[stats.zoneTendency].color }]}>
                 {TENDENCY_CONFIG[stats.zoneTendency].label}
@@ -125,9 +123,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderLight,
   },
-  umpireIcon: {
-    fontSize: 28,
-  },
   umpieName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
@@ -167,9 +162,6 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.sm,
-  },
-  tendencyIcon: {
-    fontSize: 20,
   },
   tendencyText: {
     flex: 1,
