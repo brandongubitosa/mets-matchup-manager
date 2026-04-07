@@ -104,13 +104,10 @@ export const BatterMatchupScreen: React.FC<BatterMatchupScreenProps> = ({ naviga
 
   const openPitcherCard = (pitcher: RosterPlayer) => {
     if (!selectedBatter || !selectedTeamId) return;
-    navigation.navigate('PlayerBackCard', {
-      playerId: pitcher.id,
-      counterpartPlayerId: selectedBatter.id,
-      counterpartPlayerName: selectedBatter.fullName,
-      opponentTeamId: selectedTeamId,
-      opponentTeamName: opponentName ?? MLB_TEAMS[selectedTeamId]?.abbreviation ?? 'Opponent',
-      backToBatterMatchup: flowBase,
+    navigation.navigate('MatchupDetail', {
+      batterId: selectedBatter.id,
+      pitcherId: pitcher.id,
+      mode: 'batter',
     });
   };
 

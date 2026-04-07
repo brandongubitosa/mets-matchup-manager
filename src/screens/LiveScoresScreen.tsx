@@ -232,14 +232,14 @@ const LiveGameCard: React.FC<{
             <View style={styles.rheRow}>
               <Text style={styles.rheTeam}>{awayAbbr}</Text>
               <Text style={[styles.rheValue, awayWinning && styles.rheValueBold]}>{game.awayScore}</Text>
-              <Text style={styles.rheValue}>{game.awayHits}</Text>
-              <Text style={styles.rheValue}>{game.awayErrors}</Text>
+              <Text style={styles.rheValue}>{game.awayHits ?? '—'}</Text>
+              <Text style={styles.rheValue}>{game.awayErrors ?? '—'}</Text>
             </View>
             <View style={styles.rheRow}>
               <Text style={styles.rheTeam}>{homeAbbr}</Text>
               <Text style={[styles.rheValue, homeWinning && styles.rheValueBold]}>{game.homeScore}</Text>
-              <Text style={styles.rheValue}>{game.homeHits}</Text>
-              <Text style={styles.rheValue}>{game.homeErrors}</Text>
+              <Text style={styles.rheValue}>{game.homeHits ?? '—'}</Text>
+              <Text style={styles.rheValue}>{game.homeErrors ?? '—'}</Text>
             </View>
           </View>
         )}

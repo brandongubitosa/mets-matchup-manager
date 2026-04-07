@@ -112,20 +112,39 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
 
   const opponentAbbr = MLB_TEAMS[game.opponent.id]?.abbreviation || '???';
   const logoSize = compact ? 40 : 48;
+  const isFinal = game.status === 'Final';
+  const isLive  = game.status === 'Live';
+  const isPostponed = game.status === 'Postponed' || game.status === 'Delayed' || game.status === 'Cancelled';
+
+  // Determine winner for W/L badges
+  const myScore   = game.isHome ? game.homeScore : game.awayScore;
+  const oppScore  = game.isHome ? game.awayScore : game.homeScore;
+  const iWon      = isFinal && myScore !== undefined && oppScore !== undefined && myScore > oppScore;
+  const iLost     = isFinal && myScore !== undefined && oppScore !== undefined && myScore < oppScore;
 
   return (
     <View style={[styles.container, compact && styles.containerCompact]}>
       <LinearGradient
-        colors={[COLORS.primaryDark, COLORS.primary]}
+        colors={isFinal ? ['#374151', '#4B5563'] : [COLORS.primaryDark, COLORS.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
         <View style={styles.headerLeft}>
-          <PulsingDot />
-          <Text style={styles.headerTitle}>TODAY'S GAME</Text>
+          {isLive ? <PulsingDot /> : null}
+          {isFinal ? (
+            <View style={styles.finalBadge}>
+              <Text style={styles.finalBadgeText}>FINAL</Text>
+            </View>
+          ) : (
+            <Text style={styles.headerTitle}>
+              {isLive ? 'LIVE' : isPostponed ? game.status.toUpperCase() : "TODAY'S GAME"}
+            </Text>
+          )}
         </View>
-        <Text style={styles.gameTime}>{formatGameTime(game.gameTime)}</Text>
+        <Text style={styles.gameTime}>
+          {isFinal || isLive ? '' : formatGameTime(game.gameTime)}
+        </Text>
       </LinearGradient>
 
       <View style={[styles.matchupRow, compact && styles.matchupRowCompact]}>
@@ -134,25 +153,47 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
           <Text style={[styles.teamAbbr, compact && styles.teamAbbrCompact]}>
             {MLB_TEAMS[teamId]?.abbreviation || '???'}
           </Text>
-          <View style={[styles.homeAwayBadge, game.isHome && styles.homeAwayBadgeActive]}>
-            <Text style={[styles.homeAway, game.isHome && styles.homeAwayActive]}>
-              {game.isHome ? 'HOME' : 'AWAY'}
+          {(isFinal || isLive) && myScore !== undefined ? (
+            <Text style={[styles.scoreText, iWon && styles.scoreWinner, iLost && styles.scoreLoser]}>
+              {myScore}
             </Text>
-          </View>
+          ) : (
+            <View style={[styles.homeAwayBadge, game.isHome && styles.homeAwayBadgeActive]}>
+              <Text style={[styles.homeAway, game.isHome && styles.homeAwayActive]}>
+                {game.isHome ? 'HOME' : 'AWAY'}
+              </Text>
+            </View>
+          )}
+          {isFinal && (
+            <View style={[styles.resultBadge, iWon ? styles.resultWin : iLost ? styles.resultLoss : styles.resultTie]}>
+              <Text style={styles.resultBadgeText}>{iWon ? 'W' : iLost ? 'L' : 'T'}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.vsContainer}>
-          <Text style={styles.vsText}>VS</Text>
+          <Text style={styles.vsText}>{(isFinal || isLive) ? '–' : 'VS'}</Text>
         </View>
 
         <View style={styles.teamInfo}>
           <TeamLogo teamId={game.opponent.id} size={logoSize} />
           <Text style={[styles.teamAbbr, compact && styles.teamAbbrCompact]}>{opponentAbbr}</Text>
-          <View style={[styles.homeAwayBadge, !game.isHome && styles.homeAwayBadgeActive]}>
-            <Text style={[styles.homeAway, !game.isHome && styles.homeAwayActive]}>
-              {game.isHome ? 'AWAY' : 'HOME'}
+          {(isFinal || isLive) && oppScore !== undefined ? (
+            <Text style={[styles.scoreText, iLost && styles.scoreWinner, iWon && styles.scoreLoser]}>
+              {oppScore}
             </Text>
-          </View>
+          ) : (
+            <View style={[styles.homeAwayBadge, !game.isHome && styles.homeAwayBadgeActive]}>
+              <Text style={[styles.homeAway, !game.isHome && styles.homeAwayActive]}>
+                {game.isHome ? 'AWAY' : 'HOME'}
+              </Text>
+            </View>
+          )}
+          {isFinal && (
+            <View style={[styles.resultBadge, iLost ? styles.resultWin : iWon ? styles.resultLoss : styles.resultTie]}>
+              <Text style={styles.resultBadgeText}>{iLost ? 'W' : iWon ? 'L' : 'T'}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -249,6 +290,11 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             <View style={styles.lineupHeaderDivider} />
             <Text style={styles.lineupHeaderText}>{opponentAbbr}</Text>
           </View>
+          {!displayLineupLoading && (myLineup.length === 0 || oppLineup.length === 0) && (
+            <View style={styles.projectedBanner}>
+              <Text style={styles.projectedBannerText}>PROJECTED LINEUP</Text>
+            </View>
+          )}
 
           {displayLineupLoading ? (
             <View style={styles.lineupLoading}>
@@ -345,8 +391,8 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         </View>
       )}
 
-      {/* Action buttons — side-by-side in compact mode */}
-      {(onViewMatchups || onPredictGame) && (
+      {/* Action buttons — hidden for completed games */}
+      {!isFinal && (onViewMatchups || onPredictGame) && (
         <View style={compact ? styles.buttonsRow : undefined}>
           {onViewMatchups && (
             <TouchableOpacity
@@ -575,6 +621,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textMuted,
     opacity: 0.3,
   },
+  projectedBanner: {
+    backgroundColor: `${COLORS.secondary}18`,
+    paddingVertical: 3,
+    alignItems: 'center',
+  },
+  projectedBannerText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.secondary,
+    letterSpacing: 1,
+  },
   lineupLoading: {
     flex: 1,
     justifyContent: 'center',
@@ -755,5 +812,51 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
     fontWeight: '600',
+  },
+  finalBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  finalBadgeText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '800',
+    color: COLORS.white,
+    letterSpacing: 1.5,
+  },
+  scoreText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: COLORS.textPrimary,
+    marginTop: 2,
+  },
+  scoreWinner: {
+    color: COLORS.success,
+  },
+  scoreLoser: {
+    color: COLORS.textMuted,
+  },
+  resultBadge: {
+    marginTop: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultWin: {
+    backgroundColor: COLORS.success,
+  },
+  resultLoss: {
+    backgroundColor: COLORS.danger,
+  },
+  resultTie: {
+    backgroundColor: COLORS.textMuted,
+  },
+  resultBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '900',
+    color: COLORS.white,
   },
 });

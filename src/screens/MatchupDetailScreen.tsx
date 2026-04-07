@@ -10,9 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants';
-import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard, StrikeZoneChart, PitchArsenalCard, RecentFormCard, BatterSplitsCard } from '../components';
-import { MatchupResult, HotZone, PitchArsenalMatchup, RecentBatterStats, RecentPitcherStats, BatterSplitEntry, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
-import { getBatterVsPitcher, getBatterHotZones, getPitchArsenalMatchup, getBatterRecentForm, getPitcherRecentForm, getBatterSplits } from '../services/mlbApi';
+import { StatsTable, StatBar, SkeletonStatsTable, AnimatedCard, StrikeZoneChart, PitchArsenalCard, RecentFormCard, BatterSplitsCard, SprayChartCard } from '../components';
+import { MatchupResult, HotZone, PitchArsenalMatchup, RecentBatterStats, RecentPitcherStats, BatterSplitEntry, PitcherSeasonStats, MatchupDetailScreenNavigationProp, MatchupDetailScreenRouteProp } from '../types';
+import { getBatterVsPitcher, getBatterHotZones, getPitchArsenalMatchup, getBatterRecentForm, getPitcherRecentForm, getBatterSplits, getBatterSprayChart, getPitcherSeasonStats, SprayChartData } from '../services/mlbApi';
 
 type MatchupDetailScreenProps = {
   navigation: MatchupDetailScreenNavigationProp;
@@ -45,6 +45,10 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
   const [batterSplits, setBatterSplits] = useState<BatterSplitEntry[]>([]);
   const [splitsLoading, setSplitsLoading] = useState(true);
   const [splitsNoData, setSplitsNoData] = useState(false);
+  const [sprayChart, setSprayChart] = useState<SprayChartData | null>(null);
+  const [sprayLoading, setSprayLoading] = useState(true);
+  const [sprayNoData, setSprayNoData] = useState(false);
+  const [pitcherSeason, setPitcherSeason] = useState<PitcherSeasonStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,13 +57,15 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
       setLoading(true);
       setError(null);
 
-      const [result, zonesResult, arsenalResult, batterFormResult, pitcherFormResult, splitsResult] = await Promise.all([
+      const [result, zonesResult, arsenalResult, batterFormResult, pitcherFormResult, splitsResult, sprayResult, pitcherSeasonResult] = await Promise.all([
         getBatterVsPitcher(batterId, pitcherId),
         getBatterHotZones(batterId),
         getPitchArsenalMatchup(pitcherId, batterId),
         getBatterRecentForm(batterId),
         getPitcherRecentForm(pitcherId),
         getBatterSplits(batterId),
+        getBatterSprayChart(batterId),
+        getPitcherSeasonStats(pitcherId),
       ]);
 
       if (cancelled) return;
@@ -95,6 +101,17 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
         setSplitsNoData(true);
       }
       setSplitsLoading(false);
+
+      if (sprayResult.success) {
+        setSprayChart(sprayResult.data);
+      } else {
+        setSprayNoData(true);
+      }
+      setSprayLoading(false);
+
+      if (pitcherSeasonResult?.success) {
+        setPitcherSeason(pitcherSeasonResult.data.stats);
+      }
     };
 
     fetchMatchup();
@@ -207,18 +224,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           </TouchableOpacity>
 
           <View style={styles.vsContainer}>
-            <TouchableOpacity
-              style={styles.playerBox}
-              activeOpacity={0.85}
-              onPress={() =>
-                navigation.navigate('PlayerBackCard', {
-                  playerId: matchup.batter.id,
-                  counterpartPlayerId: matchup.pitcher.id,
-                  counterpartPlayerName: matchup.pitcher.fullName,
-                  backToMatchupDetail: { batterId, pitcherId, mode },
-                })
-              }
-            >
+            <View style={styles.playerBox}>
               <View style={styles.headshotContainer}>
                 <Image
                   source={{ uri: getHeadshotUrl(matchup.batter.id) }}
@@ -233,24 +239,13 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
                   {matchup.batter.batSide.code === 'S' ? 'Switch' : `Bats ${matchup.batter.batSide.code}`}
                 </Text>
               )}
-            </TouchableOpacity>
+            </View>
 
             <View style={styles.vsCircle}>
               <Text style={styles.vsText}>VS</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.playerBox}
-              activeOpacity={0.85}
-              onPress={() =>
-                navigation.navigate('PlayerBackCard', {
-                  playerId: matchup.pitcher.id,
-                  counterpartPlayerId: matchup.batter.id,
-                  counterpartPlayerName: matchup.batter.fullName,
-                  backToMatchupDetail: { batterId, pitcherId, mode },
-                })
-              }
-            >
+            <View style={styles.playerBox}>
               <View style={styles.headshotContainer}>
                 <Image
                   source={{ uri: getHeadshotUrl(matchup.pitcher.id) }}
@@ -263,7 +258,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
               {matchup.pitcher.pitchHand && (
                 <Text style={styles.playerDetail}>Throws {matchup.pitcher.pitchHand.code}</Text>
               )}
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.badgeRow}>
@@ -291,6 +286,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             batterForm={batterForm}
             pitcherForm={pitcherForm}
             batterSeason={matchup.seasonStats}
+            pitcherSeason={pitcherSeason ?? undefined}
             loading={formLoading}
           />
         </AnimatedCard>
@@ -309,7 +305,7 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
           <AnimatedCard delay={100}>
             <View style={styles.seasonSection}>
               <Text style={styles.seasonTitle}>
-                {matchup.batter.fullName} - Current Season
+                {matchup.batter.fullName} — Season
               </Text>
               <View style={styles.seasonGrid}>
                 <View style={styles.seasonStat}>
@@ -335,6 +331,44 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
                 <View style={styles.seasonStat}>
                   <Text style={styles.seasonValue}>{seasonStats.gamesPlayed}</Text>
                   <Text style={styles.seasonLabel}>GP</Text>
+                </View>
+              </View>
+            </View>
+          </AnimatedCard>
+        )}
+
+        {pitcherSeason && (
+          <AnimatedCard delay={110}>
+            <View style={styles.seasonSection}>
+              <Text style={styles.seasonTitle}>
+                {matchup.pitcher.fullName} — Season
+              </Text>
+              <View style={styles.seasonGrid}>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>{pitcherSeason.era}</Text>
+                  <Text style={styles.seasonLabel}>ERA</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>{pitcherSeason.whip}</Text>
+                  <Text style={styles.seasonLabel}>WHIP</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>{pitcherSeason.strikeouts}</Text>
+                  <Text style={styles.seasonLabel}>K</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>{pitcherSeason.walks}</Text>
+                  <Text style={styles.seasonLabel}>BB</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>{pitcherSeason.inningsPitched}</Text>
+                  <Text style={styles.seasonLabel}>IP</Text>
+                </View>
+                <View style={styles.seasonStat}>
+                  <Text style={[styles.seasonValue, styles.pitcherSeasonValue]}>
+                    {pitcherSeason.wins ?? '—'}–{pitcherSeason.losses ?? '—'}
+                  </Text>
+                  <Text style={styles.seasonLabel}>W–L</Text>
                 </View>
               </View>
             </View>
@@ -419,6 +453,15 @@ export const MatchupDetailScreen: React.FC<MatchupDetailScreenProps> = ({
             batterName={matchup.batter.fullName}
             loading={zonesLoading}
             noData={zonesNoData}
+          />
+        </AnimatedCard>
+
+        <AnimatedCard delay={500}>
+          <SprayChartCard
+            data={sprayChart}
+            batterName={matchup.batter.fullName}
+            loading={sprayLoading}
+            noData={sprayNoData}
           />
         </AnimatedCard>
 
@@ -599,6 +642,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: '800',
     color: COLORS.primary,
+  },
+  pitcherSeasonValue: {
+    color: COLORS.secondary,
   },
   seasonLabel: {
     fontSize: FONT_SIZE.xs,

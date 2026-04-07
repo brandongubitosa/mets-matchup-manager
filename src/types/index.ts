@@ -101,6 +101,9 @@ export interface TodaysGame {
     fullName: string;
     pitchHand?: string;
   };
+  status: 'Preview' | 'Live' | 'Final' | 'Postponed' | 'Delayed' | 'Cancelled';
+  homeScore?: number;
+  awayScore?: number;
 }
 
 export interface RosterPlayer extends Player {
@@ -189,6 +192,9 @@ export interface PitcherSeasonStats {
   wins?: number;
   losses?: number;
   saves?: number;
+  homeRuns?: number;
+  hitByPitch?: number;
+  fip?: string;
 }
 
 export interface BatterPredictionItem {
@@ -217,6 +223,8 @@ export interface TeamStaffStats {
   whip: string;
   strikeouts: number;
   walks: number;
+  rsPerGame?: number;
+  raPerGame?: number;
 }
 
 export interface TeamPredictionData {
@@ -335,5 +343,27 @@ export class ApiError extends Error {
 export type ApiResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+export interface BullpenAppearance {
+  date: string;
+  inningsPitched: string;
+  numberOfPitches: number;
+  earnedRuns: number;
+}
+
+export interface BullpenPitcherStatus {
+  playerId: number;
+  fullName: string;
+  daysRest: number;             // days since last appearance; 99 = no recent outing
+  lastAppearance?: BullpenAppearance;
+  consecutiveDays: number;      // consecutive days appeared
+  status: 'available' | 'limited' | 'unavailable';
+}
+
+export interface TeamBullpenStatus {
+  teamId: number;
+  teamName: string;
+  pitchers: BullpenPitcherStatus[];
+}
 
 export * from './navigation';

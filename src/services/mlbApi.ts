@@ -22,6 +22,8 @@ import {
   LiveGame,
   LineupPlayer,
   TeamStaffStats,
+  BullpenPitcherStatus,
+  TeamBullpenStatus,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
 
@@ -32,6 +34,19 @@ const api = axios.create({
   baseURL: BASE_URL,
   timeout: API_TIMEOUT_MS,
 });
+
+/** Calendar YYYY-MM-DD in the user's local timezone (avoids UTC day-shift from `toISOString()`). */
+export const formatLocalDateYMD = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const parseLocalYMD = (ymd: string): Date => {
+  const [y, m, d] = ymd.split('-').map((x) => parseInt(x, 10));
+  return new Date(y, m - 1, d);
+};
 
 // Helper to parse player name - handles complex names like "J.D. Martinez" or "Fernando Tatis Jr."
 const parsePlayerName = (fullName: string, firstName?: string, lastName?: string): { firstName: string; lastName: string } => {
@@ -392,12 +407,15 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
   isHome: boolean;
   opponent: { id: number; name: string };
   probablePitcher?: { id: number; fullName: string };
-  myProbablePitcher?: { id: number; fullName: string };
+  myProbablePitcher?: { id: number; fullName: string; pitchHand?: string };
+  status: 'Preview' | 'Live' | 'Final' | 'Postponed' | 'Delayed' | 'Cancelled';
+  homeScore?: number;
+  awayScore?: number;
 }>> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDateYMD(new Date());
     const response = await api.get(
-      `/schedule?sportId=1&teamId=${teamId}&date=${today}&hydrate=probablePitcher`
+      `/schedule?sportId=1&teamId=${teamId}&date=${today}&hydrate=probablePitcher,linescore`
     );
 
     const games = response.data?.dates?.[0]?.games;
@@ -414,6 +432,29 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
     const myTeamData = isHome ? game.teams.home : game.teams.away;
     const probablePitcherData = opposingTeamData?.probablePitcher;
     const myProbablePitcherData = myTeamData?.probablePitcher;
+
+    // Game status
+    const abstractState: string = game.status?.abstractGameState ?? 'Preview';
+    const detailedState: string = game.status?.detailedState ?? '';
+    let status: 'Preview' | 'Live' | 'Final' | 'Postponed' | 'Delayed' | 'Cancelled';
+    if (abstractState === 'Final' || detailedState === 'Final' || detailedState === 'Game Over' || detailedState === 'Completed Early') {
+      status = 'Final';
+    } else if (abstractState === 'Live' || detailedState === 'In Progress') {
+      status = 'Live';
+    } else if (detailedState === 'Postponed') {
+      status = 'Postponed';
+    } else if (detailedState.includes('Delay') || detailedState.includes('Suspended')) {
+      status = 'Delayed';
+    } else if (detailedState === 'Cancelled') {
+      status = 'Cancelled';
+    } else {
+      status = 'Preview';
+    }
+
+    const homeScore = typeof game.teams.home.score === 'number' ? game.teams.home.score
+      : game.linescore?.teams?.home?.runs ?? undefined;
+    const awayScore = typeof game.teams.away.score === 'number' ? game.teams.away.score
+      : game.linescore?.teams?.away?.runs ?? undefined;
 
     return {
       success: true,
@@ -439,6 +480,9 @@ export const getTodaysGameForTeam = async (teamId: number): Promise<ApiResult<{
         myProbablePitcher: myProbablePitcherData?.id
           ? { id: myProbablePitcherData.id, fullName: myProbablePitcherData.fullName, pitchHand: myProbablePitcherData.pitchHand?.code as string | undefined }
           : undefined,
+        status,
+        homeScore,
+        awayScore,
       },
     };
   } catch (error) {
@@ -623,7 +667,7 @@ export const getBatterRecentForm = async (
   try {
     const yr = season ?? new Date().getFullYear();
     const response = await api.get(
-      `/people/${batterId}/stats?stats=gameLog&group=hitting&season=${yr}`
+      `/people/${batterId}/stats?stats=gameLog&group=hitting&season=${yr}&gameType=R`
     );
 
     const splits: Array<{ stat: RawGameLogStat }> = response.data?.stats?.[0]?.splits ?? [];
@@ -654,7 +698,7 @@ export const getPitcherRecentForm = async (
   try {
     const yr = season ?? new Date().getFullYear();
     const response = await api.get(
-      `/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${yr}`
+      `/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${yr}&gameType=R`
     );
 
     const splits: Array<{ stat: RawGameLogStat }> = response.data?.stats?.[0]?.splits ?? [];
@@ -722,11 +766,15 @@ export const getPitcherArsenal = async (
 ): Promise<ApiResult<PitcherArsenalPitch[]>> => {
   try {
     const yr = season ?? new Date().getFullYear();
-    const response = await api.get(
-      `/people/${pitcherId}/stats?stats=pitchArsenal&group=pitching&season=${yr}`
-    );
-
-    const splits: RawArsenalSplit[] = response.data?.stats?.[0]?.splits ?? [];
+    const yearsToTry = season ? [season] : [yr, yr - 1];
+    let splits: RawArsenalSplit[] = [];
+    for (const y of yearsToTry) {
+      const response = await api.get(
+        `/people/${pitcherId}/stats?stats=pitchArsenal&group=pitching&season=${y}`
+      );
+      splits = response.data?.stats?.[0]?.splits ?? [];
+      if (splits.length > 0) break;
+    }
     if (splits.length === 0) {
       return { success: false, error: 'No arsenal data available' };
     }
@@ -739,7 +787,7 @@ export const getPitcherArsenal = async (
           pitchCode: code,
           pitchName: PITCH_NAMES[code] ?? s.stat!.type!.description ?? code,
           usagePct: s.stat?.percentage ?? 0,
-          avgVelocity: s.stat?.avgSpeed ?? 0,
+          avgVelocity: s.stat?.avgSpeed ?? s.stat?.averageSpeed ?? 0,
           avgSpin: s.stat?.avgSpin,
           strikeoutPct: s.stat?.strikeoutPercent,
         };
@@ -753,44 +801,137 @@ export const getPitcherArsenal = async (
   }
 };
 
+/** MLB's hitting `pitchArsenal` no longer includes AVG/AB; derive from `pitchLog` (Statcast pitch rows). */
+const PITCH_LOG_TIMEOUT_MS = 28000;
+
+const NON_SWING_EVENTS = new Set([
+  'ball',
+  'called_strike',
+  'blocked_ball',
+  'hit_by_pitch',
+  'intent_ball',
+  'pitchout',
+  'automatic_ball',
+  'automatic_strike',
+]);
+
+interface PitchLogSplitRow {
+  game?: { gamePk?: number };
+  stat?: {
+    play?: {
+      pitchNumber?: number;
+      atBatNumber?: number;
+      details?: {
+        type?: { code?: string; description?: string };
+        isAtBat?: boolean;
+        isBaseHit?: boolean;
+        event?: string;
+      };
+    };
+  };
+}
+
+const aggregatePitchLogToPitchTypeStats = (splits: PitchLogSplitRow[]): PitchTypeStats[] => {
+  const labelByCode = new Map<string, string>();
+  for (const row of splits) {
+    const t = row.stat?.play?.details?.type;
+    if (t?.code && t.description && !labelByCode.has(t.code)) {
+      labelByCode.set(t.code, t.description);
+    }
+  }
+
+  const lastPitchByAb = new Map<string, { pn: number; row: PitchLogSplitRow }>();
+
+  for (const row of splits) {
+    const play = row.stat?.play;
+    if (!play) continue;
+    const gamePk = row.game?.gamePk;
+    const abn = play.atBatNumber;
+    if (gamePk == null || abn == null) continue;
+    const pn = play.pitchNumber ?? 0;
+    const key = `${gamePk}-${abn}`;
+    const prev = lastPitchByAb.get(key);
+    if (!prev || pn > prev.pn) {
+      lastPitchByAb.set(key, { pn, row });
+    }
+  }
+
+  const abHits = new Map<string, { ab: number; hits: number }>();
+  for (const { row } of lastPitchByAb.values()) {
+    const det = row.stat?.play?.details;
+    if (!det?.isAtBat) continue;
+    const code = det.type?.code;
+    if (!code) continue;
+    const cur = abHits.get(code) ?? { ab: 0, hits: 0 };
+    cur.ab += 1;
+    if (det.isBaseHit) cur.hits += 1;
+    abHits.set(code, cur);
+  }
+
+  const swingWhiff = new Map<string, { swings: number; whiffs: number }>();
+  for (const row of splits) {
+    const det = row.stat?.play?.details;
+    if (!det?.type?.code) continue;
+    const code = det.type.code;
+    const ev = det.event ?? '';
+    if (NON_SWING_EVENTS.has(ev)) continue;
+    const sw = swingWhiff.get(code) ?? { swings: 0, whiffs: 0 };
+    sw.swings += 1;
+    if (ev === 'swinging_strike') sw.whiffs += 1;
+    swingWhiff.set(code, sw);
+  }
+
+  const codes = new Set<string>([...abHits.keys(), ...swingWhiff.keys()]);
+  const out: PitchTypeStats[] = [];
+
+  for (const code of codes) {
+    const ah = abHits.get(code) ?? { ab: 0, hits: 0 };
+    const sw = swingWhiff.get(code) ?? { swings: 0, whiffs: 0 };
+    const avg =
+      ah.ab > 0
+        ? (ah.hits / ah.ab).toFixed(3).replace(/^0/, '.')
+        : '.000';
+    const whiffRate =
+      sw.swings > 0 ? ((sw.whiffs / sw.swings) * 100).toFixed(0) + '%' : '0%';
+
+    out.push({
+      pitchCode: code,
+      pitchType: PITCH_NAMES[code] ?? labelByCode.get(code) ?? code,
+      atBats: ah.ab,
+      hits: ah.hits,
+      avg,
+      whiffs: sw.whiffs,
+      swings: sw.swings,
+      whiffRate,
+    });
+  }
+
+  return out.sort((a, b) => b.atBats - a.atBats);
+};
+
 export const getBatterVsPitchType = async (
   batterId: number,
   season?: number
 ): Promise<ApiResult<PitchTypeStats[]>> => {
   try {
     const yr = season ?? new Date().getFullYear();
+    const endDate = formatLocalDateYMD(new Date());
+    const startDate = `${yr}-02-20`;
+
     const response = await api.get(
-      `/people/${batterId}/stats?stats=pitchArsenal&group=hitting&season=${yr}`
+      `/people/${batterId}/stats?stats=pitchLog&group=hitting&season=${yr}&gameType=R&startDate=${startDate}&endDate=${endDate}`,
+      { timeout: PITCH_LOG_TIMEOUT_MS }
     );
 
-    const splits: RawArsenalSplit[] = response.data?.stats?.[0]?.splits ?? [];
+    const splits: PitchLogSplitRow[] = response.data?.stats?.[0]?.splits ?? [];
     if (splits.length === 0) {
       return { success: false, error: 'No batter pitch data available' };
     }
 
-    const stats: PitchTypeStats[] = splits
-      .filter((s) => s.stat?.type?.code)
-      .map((s) => {
-        const code = s.stat!.type!.code!;
-        const atBats = s.stat?.atBats ?? 0;
-        const whiffs = s.stat?.whiffs ?? 0;
-        const swings = s.stat?.swings ?? 0;
-        return {
-          pitchCode: code,
-          pitchType: PITCH_NAMES[code] ?? s.stat!.type!.description ?? code,
-          atBats,
-          hits: s.stat?.hits ?? 0,
-          avg: s.stat?.avg ?? '.000',
-          whiffs,
-          swings,
-          whiffRate:
-            swings > 0
-              ? ((whiffs / swings) * 100).toFixed(0) + '%'
-              : s.stat?.whiffPercent != null
-              ? (s.stat.whiffPercent * 100).toFixed(0) + '%'
-              : '0%',
-        };
-      });
+    const stats = aggregatePitchLogToPitchTypeStats(splits);
+    if (stats.length === 0) {
+      return { success: false, error: 'No batter pitch data available' };
+    }
 
     return { success: true, data: stats };
   } catch (error) {
@@ -827,6 +968,50 @@ export const getPitchArsenalMatchup = async (
   return { success: true, data: matchups };
 };
 
+// ─── Spray Chart ─────────────────────────────────────────────────────────────
+
+export interface SprayChartData {
+  leftField: number;
+  leftCenterField: number;
+  centerField: number;
+  rightCenterField: number;
+  rightField: number;
+  total: number;
+}
+
+export const getBatterSprayChart = async (
+  batterId: number,
+  season?: number
+): Promise<ApiResult<SprayChartData>> => {
+  try {
+    const yr = season ?? new Date().getFullYear();
+    const response = await api.get(
+      `/people/${batterId}/stats?stats=sprayChart&group=hitting&season=${yr}&gameType=R`
+    );
+    const stat = response.data?.stats?.[0]?.splits?.[0]?.stat;
+    if (!stat) {
+      return { success: false, error: 'No spray chart data available' };
+    }
+
+    const lf = stat.leftField ?? 0;
+    const lcf = stat.leftCenterField ?? 0;
+    const cf = stat.centerField ?? 0;
+    const rcf = stat.rightCenterField ?? 0;
+    const rf = stat.rightField ?? 0;
+    const total = lf + lcf + cf + rcf + rf;
+    if (total === 0) {
+      return { success: false, error: 'No spray chart data available' };
+    }
+
+    return {
+      success: true,
+      data: { leftField: lf, leftCenterField: lcf, centerField: cf, rightCenterField: rcf, rightField: rf, total },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
 // ─── Hot Zone (Strike Zone Chart) ───────────────────────────────────────────
 
 export const getBatterHotZones = async (
@@ -835,33 +1020,30 @@ export const getBatterHotZones = async (
 ): Promise<ApiResult<HotZone[]>> => {
   try {
     const yr = season ?? new Date().getFullYear();
-    const response = await api.get(
-      `/people/${batterId}/stats?stats=hotZone&group=hitting&season=${yr}`
-    );
+    const yearsToTry = season ? [season] : [yr, yr - 1];
+    let result: Array<{ zone: string; value: string; color?: string; temp?: string }> = [];
 
-    const splits = response.data?.stats?.[0]?.splits;
-    if (!splits || splits.length === 0) {
-      return { success: false, error: 'No hot zone data available' };
+    for (const y of yearsToTry) {
+      const response = await api.get(
+        `/people/${batterId}/stats?stats=hotColdZones&group=hitting&season=${y}`
+      );
+
+      const splits: Array<{ stat?: { name?: string; zones?: Array<{ zone: string; value: string; color?: string; temp?: string }> } }> =
+        response.data?.stats?.[0]?.splits ?? [];
+      if (splits.length === 0) continue;
+
+      // The API returns multiple splits — one per metric. Find battingAverage.
+      const avgSplit = splits.find((s) => s.stat?.name === 'battingAverage') ?? splits[0];
+      const zones = avgSplit?.stat?.zones ?? [];
+
+      if (zones.length > 0) {
+        result = zones;
+        break;
+      }
     }
 
-    // MLB API returns zones nested inside splits[0].stat.zones
-    const zones: Array<{ zone: string; value: string; color?: string; temp?: string }> =
-      splits[0]?.stat?.zones ?? [];
-
-    // Fallback: some API versions return zone as a top-level split property
-    const fallbackZones = splits
-      .filter((s: { zone?: string }) => s.zone)
-      .map((s: { zone: string; stat?: { avg?: string; color?: string; temp?: string } }) => ({
-        zone: s.zone,
-        value: s.stat?.avg ?? '0',
-        color: s.stat?.color,
-        temp: s.stat?.temp,
-      }));
-
-    const result: Array<{ zone: string; value: string; color?: string; temp?: string }> =
-      zones.length > 0 ? zones : fallbackZones;
     if (result.length === 0) {
-      return { success: false, error: 'No zone data found' };
+      return { success: false, error: 'No hot zone data available' };
     }
 
     return {
@@ -878,11 +1060,344 @@ export const getBatterHotZones = async (
   }
 };
 
+// ─── Umpire Stats ─────────────────────────────────────────────────────────────
+
+export interface UmpireStats {
+  name: string;
+  games: number;
+  accuracyPct: number;       // overall_accuracy_wmean
+  consistencyPct: number;    // consistency_wmean
+  runImpact: number;         // total_run_impact_mean — avg runs affected per game
+  zoneTendency: 'pitcher-friendly' | 'neutral' | 'hitter-friendly';
+  tendencyDetail: string;
+}
+
+export const getUmpireStats = async (gameId: number): Promise<ApiResult<UmpireStats>> => {
+  try {
+    // Step 1: Get the home plate umpire from the MLB schedule API
+    const scheduleRes = await api.get(
+      `/schedule?gamePks=${gameId}&hydrate=officials`
+    );
+    const game = scheduleRes.data?.dates?.[0]?.games?.[0];
+    const officials: Array<{ official: { fullName: string }; officialType: string }> =
+      game?.officials ?? [];
+    const hpUmpire = officials.find((o) => o.officialType === 'Home Plate');
+    if (!hpUmpire) {
+      return { success: false, error: 'Home plate umpire not yet assigned' };
+    }
+    const umpireName = hpUmpire.official.fullName;
+
+    // Step 2: Fetch career stats from umpscorecards
+    const umpRes = await axios.create({ timeout: 8000 }).get(
+      'https://umpscorecards.com/api/umpires/',
+      { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } }
+    );
+    const rows: Array<{
+      umpire: string;
+      n: number;
+      overall_accuracy_wmean: number;
+      consistency_wmean: number;
+      total_run_impact_mean: number;
+    }> = umpRes.data?.rows ?? [];
+
+    if (rows.length === 0) {
+      return { success: false, error: 'Umpire stats unavailable' };
+    }
+
+    // Match by last name + first initial
+    const [firstName, ...rest] = umpireName.split(' ');
+    const lastName = rest.join(' ').toLowerCase();
+    const firstInitial = firstName[0]?.toLowerCase();
+
+    const match = rows.find((r) => {
+      const parts = r.umpire.toLowerCase().split(' ');
+      const rLast = parts.slice(1).join(' ');
+      const rFirst = parts[0]?.[0];
+      return rLast === lastName && rFirst === firstInitial;
+    }) ?? rows.find((r) => r.umpire.toLowerCase().includes(lastName));
+
+    if (!match) {
+      return { success: false, error: `No stats found for ${umpireName}` };
+    }
+
+    const accuracyPct = match.overall_accuracy_wmean;
+    const consistencyPct = match.consistency_wmean;
+    const runImpact = match.total_run_impact_mean;
+
+    // Zone tendency: accuracy above ~94.5% = tighter zone (more correct strikes called = pitchers helped)
+    // Accuracy below ~93% = looser zone (more balls called on true strikes = hitters helped)
+    let zoneTendency: UmpireStats['zoneTendency'];
+    let tendencyDetail: string;
+    if (accuracyPct >= 94.5) {
+      zoneTendency = 'pitcher-friendly';
+      tendencyDetail = `${accuracyPct.toFixed(1)}% accuracy — tight, consistent zone`;
+    } else if (accuracyPct < 93.0) {
+      zoneTendency = 'hitter-friendly';
+      tendencyDetail = `${accuracyPct.toFixed(1)}% accuracy — wider zone, more walks possible`;
+    } else {
+      zoneTendency = 'neutral';
+      tendencyDetail = `${accuracyPct.toFixed(1)}% accuracy — average zone`;
+    }
+
+    return {
+      success: true,
+      data: {
+        name: match.umpire,
+        games: match.n,
+        accuracyPct,
+        consistencyPct,
+        runImpact,
+        zoneTendency,
+        tendencyDetail,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+// ─── Weather ─────────────────────────────────────────────────────────────────
+
+export interface GameWeather {
+  tempF: number;
+  windSpeedMph: number;
+  windDirectionDeg: number;
+  windDirectionLabel: string;
+  precipProbability: number;  // 0–100
+  isDome: boolean;
+  parkName: string;
+  impact: 'pitcher-friendly' | 'neutral' | 'hitter-friendly' | 'rain-risk';
+  impactDetail: string;
+}
+
+const degToCompass = (deg: number): string => {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return dirs[Math.round(deg / 45) % 8];
+};
+
+export const getGameWeather = async (
+  homeTeamId: number,
+  gameTimeUtc?: string   // ISO UTC string; if absent defaults to today at 7pm
+): Promise<ApiResult<GameWeather>> => {
+  try {
+    const { BALLPARK_INFO } = await import('../constants');
+    const park = BALLPARK_INFO[homeTeamId];
+
+    if (!park) {
+      return { success: false, error: 'No ballpark data for this team' };
+    }
+
+    if (park.dome) {
+      return {
+        success: true,
+        data: {
+          tempF: 72,
+          windSpeedMph: 0,
+          windDirectionDeg: 0,
+          windDirectionLabel: 'N/A',
+          precipProbability: 0,
+          isDome: true,
+          parkName: park.name,
+          impact: 'neutral',
+          impactDetail: 'Indoor stadium — weather has no effect',
+        },
+      };
+    }
+
+    // Determine what hour index to use (0–23)
+    let targetHour = 19; // default 7 pm local
+    if (gameTimeUtc) {
+      const gameDate = new Date(gameTimeUtc);
+      // Rough local hour based on timezone offset heuristic
+      const offsetMap: Record<string, number> = {
+        'America/New_York': -4,
+        'America/Chicago': -5,
+        'America/Denver': -6,
+        'America/Los_Angeles': -7,
+        'America/Phoenix': -7,
+      };
+      const offset = offsetMap[park.timezone] ?? -4;
+      targetHour = Math.max(0, Math.min(23, gameDate.getUTCHours() + offset));
+    }
+
+    const response = await axios.create({ timeout: 8000 }).get(
+      `https://api.open-meteo.com/v1/forecast?latitude=${park.lat}&longitude=${park.lng}` +
+      `&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation_probability` +
+      `&wind_speed_unit=mph&temperature_unit=fahrenheit&forecast_days=1&timezone=${encodeURIComponent(park.timezone)}`
+    );
+
+    const hourly = response.data?.hourly;
+    if (!hourly) {
+      return { success: false, error: 'Weather data unavailable' };
+    }
+
+    const tempF = Math.round(hourly.temperature_2m?.[targetHour] ?? 72);
+    const windSpeedMph = Math.round(hourly.windspeed_10m?.[targetHour] ?? 0);
+    const windDirectionDeg = hourly.winddirection_10m?.[targetHour] ?? 0;
+    const precipProbability = hourly.precipitation_probability?.[targetHour] ?? 0;
+    const windDirectionLabel = degToCompass(windDirectionDeg);
+
+    // Determine weather impact
+    let impact: GameWeather['impact'] = 'neutral';
+    let impactDetail = 'Neutral conditions';
+
+    if (precipProbability >= 40) {
+      impact = 'rain-risk';
+      impactDetail = `${precipProbability}% chance of rain — possible delay`;
+    } else if (tempF <= 48 && windSpeedMph >= 10) {
+      impact = 'pitcher-friendly';
+      impactDetail = `Cold (${tempF}°F) + wind ${windSpeedMph} mph ${windDirectionLabel} — ball dies in cold air`;
+    } else if (tempF <= 50) {
+      impact = 'pitcher-friendly';
+      impactDetail = `Cold weather (${tempF}°F) suppresses offense`;
+    } else if (tempF >= 85 && windSpeedMph >= 10) {
+      impact = 'hitter-friendly';
+      impactDetail = `Hot (${tempF}°F) + ${windSpeedMph} mph wind — ideal for long balls`;
+    } else if (windSpeedMph >= 15) {
+      impact = 'neutral';
+      impactDetail = `Gusty ${windSpeedMph} mph from ${windDirectionLabel} — impacts fly balls`;
+    } else if (tempF >= 82) {
+      impact = 'hitter-friendly';
+      impactDetail = `Warm weather (${tempF}°F) — ball carries well`;
+    }
+
+    return {
+      success: true,
+      data: { tempF, windSpeedMph, windDirectionDeg, windDirectionLabel, precipProbability, isDome: false, parkName: park.name, impact, impactDetail },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
+// ─── Bullpen Fatigue ─────────────────────────────────────────────────────────
+
+export const getTeamBullpenFatigue = async (
+  teamId: number,
+  teamName: string,
+  starterPitcherId?: number,
+  asOfDate?: string
+): Promise<ApiResult<TeamBullpenStatus>> => {
+  try {
+    const today = asOfDate ?? formatLocalDateYMD(new Date());
+    const lookbackDate = dateNDaysAgo(7, today);
+
+    // Get the team's active pitching staff
+    const pitcherResult = await getTeamPitchers(teamId);
+    if (pitcherResult.length === 0) {
+      return { success: false, error: 'Could not fetch pitching staff' };
+    }
+
+    // Exclude the known starter so we only show relievers
+    const relievers = starterPitcherId
+      ? pitcherResult.filter((p) => p.id !== starterPitcherId)
+      : pitcherResult;
+
+    // Fetch last 7 days of game logs for all relievers in parallel
+    const gameLogResults = await Promise.all(
+      relievers.map((p) =>
+        api
+          .get(
+            `/people/${p.id}/stats?stats=gameLog&group=pitching&startDate=${lookbackDate}&endDate=${today}&gameType=R`
+          )
+          .then((r) => ({ pitcher: p, splits: r.data?.stats?.[0]?.splits ?? [] }))
+          .catch(() => ({ pitcher: p, splits: [] }))
+      )
+    );
+
+    const pitcherStatuses: BullpenPitcherStatus[] = gameLogResults.map(({ pitcher, splits }) => {
+      if (splits.length === 0) {
+        return {
+          playerId: pitcher.id,
+          fullName: pitcher.fullName,
+          daysRest: 99,
+          consecutiveDays: 0,
+          status: 'available' as const,
+        };
+      }
+
+      // Splits are in ascending date order — last entry is most recent
+      const sortedSplits = [...splits].sort(
+        (a: { date: string }, b: { date: string }) =>
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      const lastSplit = sortedSplits[sortedSplits.length - 1];
+      const lastDate = new Date(lastSplit.date);
+      const todayDate = new Date(today);
+      const diffMs = todayDate.getTime() - lastDate.getTime();
+      const daysRest = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      // Count consecutive days (working backwards from most recent)
+      let consecutiveDays = 1;
+      for (let i = sortedSplits.length - 2; i >= 0; i--) {
+        const prevDate = new Date(sortedSplits[i].date);
+        const currDate = new Date(sortedSplits[i + 1].date);
+        const daysDiff = Math.round(
+          (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (daysDiff === 1) {
+          consecutiveDays++;
+        } else {
+          break;
+        }
+      }
+
+      const pitches = lastSplit.stat?.numberOfPitches ?? 0;
+      let status: 'available' | 'limited' | 'unavailable';
+      if (daysRest <= 1) {
+        status = 'unavailable';
+      } else if (daysRest === 2 || (daysRest <= 3 && pitches >= 25)) {
+        status = 'limited';
+      } else {
+        status = 'available';
+      }
+
+      return {
+        playerId: pitcher.id,
+        fullName: pitcher.fullName,
+        daysRest,
+        lastAppearance: {
+          date: lastSplit.date,
+          inningsPitched: lastSplit.stat?.inningsPitched ?? '0.0',
+          numberOfPitches: pitches,
+          earnedRuns: lastSplit.stat?.earnedRuns ?? 0,
+        },
+        consecutiveDays,
+        status,
+      };
+    });
+
+    // Sort: unavailable first, then limited, then available; within each group by daysRest asc
+    const order = { unavailable: 0, limited: 1, available: 2 };
+    pitcherStatuses.sort((a, b) => {
+      const statusDiff = order[a.status] - order[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      return a.daysRest - b.daysRest;
+    });
+
+    // Only include pitchers who have appeared in the last 7 days OR are known relievers
+    const usedPitchers = pitcherStatuses.filter((p) => p.daysRest < 99);
+    const unusedPitchers = pitcherStatuses.filter((p) => p.daysRest === 99);
+
+    return {
+      success: true,
+      data: {
+        teamId,
+        teamName,
+        // Show used first (sorted by status/rest), then unused (fully fresh)
+        pitchers: [...usedPitchers, ...unusedPitchers],
+      },
+    };
+  } catch (error) {
+    return { success: false, error: formatError(error) };
+  }
+};
+
 // ─── Live Scores ─────────────────────────────────────────────────────────────
 
 export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDateYMD(new Date());
     const response = await api.get(
       `/schedule?sportId=1&date=${today}&hydrate=linescore,team,probablePitcher`
     );
@@ -955,18 +1470,33 @@ export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
 
 // ─── Game Prediction ────────────────────────────────────────────────────────
 
-const calculatePitcherStats = (stats: Record<string, unknown>): PitcherSeasonStats => ({
-  era: stats.era ? parseFloat(stats.era as string).toFixed(2) : '0.00',
-  whip: stats.whip ? parseFloat(stats.whip as string).toFixed(2) : '0.00',
-  strikeouts: (stats.strikeOuts as number) ?? 0,
-  walks: (stats.baseOnBalls as number) ?? 0,
-  inningsPitched: (stats.inningsPitched as string) ?? '0.0',
-  gamesStarted: (stats.gamesStarted as number) ?? 0,
-  gamesPlayed: typeof stats.gamesPlayed === 'number' ? stats.gamesPlayed : undefined,
-  wins: typeof stats.wins === 'number' ? stats.wins : undefined,
-  losses: typeof stats.losses === 'number' ? stats.losses : undefined,
-  saves: typeof stats.saves === 'number' ? stats.saves : undefined,
-});
+const calculatePitcherStats = (stats: Record<string, unknown>): PitcherSeasonStats => {
+  const hr  = typeof stats.homeRuns   === 'number' ? stats.homeRuns   : 0;
+  const hbp = typeof stats.hitBatsmen === 'number' ? stats.hitBatsmen
+            : typeof stats.hitByPitch === 'number' ? stats.hitByPitch : 0;
+  const k   = (stats.strikeOuts as number) ?? 0;
+  const bb  = (stats.baseOnBalls as number) ?? 0;
+  const ip  = parseIPtoDecimal((stats.inningsPitched as string) ?? '0.0');
+
+  // FIP = (13×HR + 3×(BB+HBP) - 2×K) / IP + 3.17  (FIP constant ~3.17 for current era)
+  const fipNum = ip >= 10 ? (13 * hr + 3 * (bb + hbp) - 2 * k) / ip + 3.17 : null;
+
+  return {
+    era:           stats.era ? parseFloat(stats.era as string).toFixed(2) : '0.00',
+    whip:          stats.whip ? parseFloat(stats.whip as string).toFixed(2) : '0.00',
+    strikeouts:    k,
+    walks:         bb,
+    inningsPitched:(stats.inningsPitched as string) ?? '0.0',
+    gamesStarted:  (stats.gamesStarted as number) ?? 0,
+    gamesPlayed:   typeof stats.gamesPlayed === 'number' ? stats.gamesPlayed : undefined,
+    wins:          typeof stats.wins   === 'number' ? stats.wins   : undefined,
+    losses:        typeof stats.losses === 'number' ? stats.losses : undefined,
+    saves:         typeof stats.saves  === 'number' ? stats.saves  : undefined,
+    homeRuns:      hr > 0 ? hr : undefined,
+    hitByPitch:    hbp > 0 ? hbp : undefined,
+    fip:           fipNum !== null && fipNum > 0 ? fipNum.toFixed(2) : undefined,
+  };
+};
 
 const emptyHittingSeason: MatchupStats = {
   gamesPlayed: 0,
@@ -1105,12 +1635,17 @@ const parseIPtoDecimal = (ip: string): number => {
   return full + thirds / 3;
 };
 
-// ISO date string N days ago
-const dateNDaysAgo = (n: number): string =>
-  new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+// YYYY-MM-DD string N calendar days ago in local time (optionally from a specific YYYY-MM-DD)
+const dateNDaysAgo = (n: number, fromDate?: string): string => {
+  const base = fromDate ? parseLocalYMD(fromDate) : new Date();
+  base.setDate(base.getDate() - n);
+  return formatLocalDateYMD(base);
+};
 
-// Combined pitcher quality factor: ERA (50%) + WHIP (30%) + K/9 (20%)
-// Optionally blended with recent ERA from last few starts (40% weight)
+// Combined pitcher quality factor using FIP when available, otherwise ERA
+// FIP removes defense luck: (13×HR + 3×(BB+HBP) - 2×K) / IP + 3.17
+// Weights: FIP(35%) + ERA(20%) + WHIP(25%) + K9(20%), or ERA(50%)+WHIP(30%)+K9(20%) without FIP
+// Blended with recent ERA from last few starts (40% weight)
 const computePitcherFactor = (stats: PitcherSeasonStats, recentEra?: string): number => {
   const era  = parseFloat(stats.era)  || LEAGUE_AVG_ERA;
   const whip = parseFloat(stats.whip) || LEAGUE_AVG_WHIP;
@@ -1121,7 +1656,16 @@ const computePitcherFactor = (stats: PitcherSeasonStats, recentEra?: string): nu
   const whipF = clamp(LEAGUE_AVG_WHIP / whip, 0.6, 1.8);
   const k9F   = clamp(k9 / LEAGUE_AVG_K9,     0.7, 1.35);
 
-  const seasonFactor = 0.50 * eraF + 0.30 * whipF + 0.20 * k9F;
+  let seasonFactor: number;
+  if (stats.fip) {
+    const fip  = parseFloat(stats.fip) || LEAGUE_AVG_ERA;
+    const fipF = clamp(LEAGUE_AVG_ERA / fip, 0.6, 1.8);
+    // FIP(35%) + ERA(20%) + WHIP(25%) + K9(20%)
+    seasonFactor = 0.35 * fipF + 0.20 * eraF + 0.25 * whipF + 0.20 * k9F;
+  } else {
+    // Fallback: ERA(50%) + WHIP(30%) + K9(20%)
+    seasonFactor = 0.50 * eraF + 0.30 * whipF + 0.20 * k9F;
+  }
 
   if (recentEra) {
     const recentEraNum = parseFloat(recentEra) || LEAGUE_AVG_ERA;
@@ -1177,12 +1721,12 @@ interface BatterFetchResult {
 }
 
 const fetchBatterPredictionStats = async (
-  batter: RosterPlayer,
+  batter: { id: number; fullName: string },
   opposingPitcherId: number | undefined,
   opposingPitchHand: string | undefined
 ): Promise<BatterPredictionItem> => {
   try {
-    const today       = new Date().toISOString().split('T')[0];
+    const today       = formatLocalDateYMD(new Date());
     const start15     = dateNDaysAgo(15);
 
     const [seasonRes, playerRes, recentRes] = await Promise.all([
@@ -1297,13 +1841,41 @@ const fetchBatterPredictionStats = async (
   }
 };
 
+// PA weight per batting order slot based on expected plate appearances per 9-inning game.
+// Leadoff hitter bats most; positions 7-9 bat least. Only applied when actual lineup is known.
+const BATTING_ORDER_WEIGHTS = [1.07, 1.05, 1.04, 1.02, 1.00, 0.98, 0.96, 0.95, 0.93];
+
+// Fetch a team's last-10 record from standings to gauge recent momentum
+const getTeamLastTenRecord = async (teamId: number): Promise<{ wins: number; losses: number } | null> => {
+  try {
+    const year = new Date().getFullYear();
+    const res = await api.get(`/standings?leagueId=103,104&season=${year}&standingsTypes=regularSeason`);
+    const divisions: Array<{ teamRecords?: Array<{
+      team?: { id: number };
+      records?: { splitRecords?: Array<{ type: string; wins: number; losses: number }> };
+    }> }> = res.data?.records ?? [];
+    for (const division of divisions) {
+      for (const tr of division.teamRecords ?? []) {
+        if (tr.team?.id === teamId) {
+          const last10 = tr.records?.splitRecords?.find((r) => r.type === 'lastTen');
+          if (last10) return { wins: last10.wins, losses: last10.losses };
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 const buildTeamData = async (
   teamId: number,
   teamName: string,
   pitcherId: number | undefined,
-  opposingPitcherId: number | undefined
+  opposingPitcherId: number | undefined,
+  lineup?: LineupPlayer[]
 ): Promise<TeamPredictionData> => {
-  const today   = new Date().toISOString().split('T')[0];
+  const today   = formatLocalDateYMD(new Date());
   const start21 = dateNDaysAgo(21);
 
   const [rosterResult, pitcherResult, pitcherRecentResult, staffResult] = await Promise.all([
@@ -1318,7 +1890,11 @@ const buildTeamData = async (
     getTeamPitchingStats(teamId),
   ]);
 
-  const batters = rosterResult.slice(0, 9);
+  // Use actual game lineup (batting order) if available, otherwise fall back to roster
+  const batters: Array<{ id: number; fullName: string }> =
+    lineup && lineup.length > 0
+      ? lineup.map((p) => ({ id: p.playerId, fullName: p.fullName }))
+      : rosterResult.slice(0, 9);
   const pitcherData = pitcherResult && 'data' in pitcherResult && pitcherResult.success
     ? pitcherResult.data
     : null;
@@ -1340,10 +1916,21 @@ const buildTeamData = async (
     batters.map((b) => fetchBatterPredictionStats(b, opposingPitcherId, pitchHand))
   );
 
-  const offensiveScore =
-    batterItems.length > 0
-      ? batterItems.reduce((sum, b) => sum + b.effectiveOPS, 0) / batterItems.length
-      : LEAGUE_AVG_OPS;
+  // Weighted offensive score: give more credit to top-of-order slots that see more PAs.
+  // Only apply weights when we have the actual confirmed batting order (not a roster fallback).
+  const hasActualLineup = lineup && lineup.length > 0;
+  const offensiveScore = batterItems.length > 0
+    ? (() => {
+        let wSum = 0;
+        let wTotal = 0;
+        batterItems.forEach((b, i) => {
+          const w = hasActualLineup ? (BATTING_ORDER_WEIGHTS[i] ?? 1.0) : 1.0;
+          wSum   += b.effectiveOPS * w;
+          wTotal += w;
+        });
+        return wSum / wTotal;
+      })()
+    : LEAGUE_AVG_OPS;
 
   return {
     teamId,
@@ -1389,16 +1976,22 @@ export const getGameLineup = async (
 
 export const getTeamPitchingStats = async (teamId: number): Promise<TeamStaffStats | null> => {
   try {
-    const res = await api.get(
-      `/teams/${teamId}/stats?stats=season&group=pitching&gameType=R`
-    );
-    const split = res.data?.stats?.[0]?.splits?.[0]?.stat;
-    if (!split) return null;
+    const [pitchRes, hitRes] = await Promise.all([
+      api.get(`/teams/${teamId}/stats?stats=season&group=pitching&gameType=R`),
+      api.get(`/teams/${teamId}/stats?stats=season&group=hitting&gameType=R`).catch(() => null),
+    ]);
+    const pitchSplit = pitchRes.data?.stats?.[0]?.splits?.[0]?.stat;
+    if (!pitchSplit) return null;
+    const hitSplit = (hitRes as { data: { stats?: Array<{ splits?: Array<{ stat?: Record<string, unknown> }> }> } } | null)
+      ?.data?.stats?.[0]?.splits?.[0]?.stat;
+    const games = (pitchSplit.gamesPlayed as number) ?? (hitSplit?.gamesPlayed as number) ?? 1;
     return {
-      era: split.era ?? '0.00',
-      whip: split.whip ?? '0.00',
-      strikeouts: split.strikeOuts ?? 0,
-      walks: split.baseOnBalls ?? 0,
+      era:         pitchSplit.era         ?? '0.00',
+      whip:        pitchSplit.whip        ?? '0.00',
+      strikeouts:  pitchSplit.strikeOuts  ?? 0,
+      walks:       pitchSplit.baseOnBalls ?? 0,
+      raPerGame:   games > 0 ? ((pitchSplit.runs as number) ?? 0) / games : undefined,
+      rsPerGame:   hitSplit && games > 0 ? ((hitSplit.runs as number) ?? 0) / games : undefined,
     };
   } catch {
     return null;
@@ -1412,15 +2005,26 @@ export const predictGame = async (params: {
   awayTeamName: string;
   homePitcherId?: number;
   awayPitcherId?: number;
+  gameId?: number;
 }): Promise<ApiResult<GamePredictionResult>> => {
   try {
-    const { homeTeamId, homeTeamName, awayTeamId, awayTeamName, homePitcherId, awayPitcherId } = params;
+    const { homeTeamId, homeTeamName, awayTeamId, awayTeamName, homePitcherId, awayPitcherId, gameId } = params;
 
-    // Fetch team data and live scores in parallel
-    const [homeData, awayData, liveScoresResult] = await Promise.all([
-      buildTeamData(homeTeamId, homeTeamName, homePitcherId, awayPitcherId),
-      buildTeamData(awayTeamId, awayTeamName, awayPitcherId, homePitcherId),
+    // Fetch game lineup, live scores, and last-10 records in parallel
+    const [gameLineup, liveScoresResult, homeLast10, awayLast10] = await Promise.all([
+      gameId ? getGameLineup(gameId) : Promise.resolve({ home: [], away: [] }),
       getLiveScores().catch(() => ({ success: false as const, error: '' })),
+      getTeamLastTenRecord(homeTeamId).catch(() => null),
+      getTeamLastTenRecord(awayTeamId).catch(() => null),
+    ]);
+
+    const homeLineup = gameLineup.home.length > 0 ? gameLineup.home : undefined;
+    const awayLineup = gameLineup.away.length > 0 ? gameLineup.away : undefined;
+
+    // Fetch team data in parallel, using actual lineup order when available
+    const [homeData, awayData] = await Promise.all([
+      buildTeamData(homeTeamId, homeTeamName, homePitcherId, awayPitcherId, homeLineup),
+      buildTeamData(awayTeamId, awayTeamName, awayPitcherId, homePitcherId, awayLineup),
     ]);
 
     // ── Park factor (home team's park) ────────────────────────────────────────
@@ -1454,13 +2058,57 @@ export const predictGame = async (params: {
     const homePitcherFactor = 1 + (rawHomePF - 1) * parkCompression;
     const awayPitcherFactor = 1 + (rawAwayPF - 1) * parkCompression;
 
-    // ── Expected run ratio → base win probability ─────────────────────────────
-    const homeRunExp   = homeData.offensiveScore * parkFactor * awayPitcherFactor;
-    const awayRunExp   = awayData.offensiveScore * parkFactor * homePitcherFactor;
-    const total        = homeRunExp + awayRunExp;
-    const baseProbHome = total > 0 ? homeRunExp / total : 0.5;
-    // 5% home field advantage
-    const preGameProb  = clamp(baseProbHome * 0.95 + 0.05, 0.01, 0.99);
+    // ── Expected run ratio → base win probability (75% of final) ────────────────
+    const homeRunExp      = homeData.offensiveScore * parkFactor * awayPitcherFactor;
+    const awayRunExp      = awayData.offensiveScore * parkFactor * homePitcherFactor;
+    const runTotal        = homeRunExp + awayRunExp;
+    const runModelProb    = runTotal > 0 ? homeRunExp / runTotal : 0.5;
+    const runModelProbHFA = clamp(runModelProb * 0.95 + 0.05, 0.01, 0.99); // +5% HFA
+
+    // ── Pythagorean win expectation (20% of final) ───────────────────────────
+    // RS^1.83 / (RS^1.83 + RA^1.83) per team, then normalised head-to-head
+    const homeRS = homeData.staffStats?.rsPerGame ?? 0;
+    const homeRA = homeData.staffStats?.raPerGame ?? 0;
+    const awayRS = awayData.staffStats?.rsPerGame ?? 0;
+    const awayRA = awayData.staffStats?.raPerGame ?? 0;
+    const EXP = 1.83;
+    const homePyth = homeRS > 0 && homeRA > 0
+      ? Math.pow(homeRS, EXP) / (Math.pow(homeRS, EXP) + Math.pow(homeRA, EXP))
+      : 0.5;
+    const awayPyth = awayRS > 0 && awayRA > 0
+      ? Math.pow(awayRS, EXP) / (Math.pow(awayRS, EXP) + Math.pow(awayRA, EXP))
+      : 0.5;
+    const pythProbHome = clamp(homePyth / (homePyth + awayPyth), 0.25, 0.75);
+    const hasPythData  = homeRS > 0 && homeRA > 0 && awayRS > 0 && awayRA > 0;
+
+    // ── Team momentum — last 10 games (5% of final when available) ───────────
+    const momentumFactor = (record: { wins: number; losses: number } | null): number => {
+      if (!record) return 1.0;
+      const total10 = record.wins + record.losses;
+      if (total10 === 0) return 1.0;
+      const winRate = record.wins / total10;
+      return clamp(0.94 + winRate * 0.12, 0.97, 1.03);
+    };
+    const homeMomentum = momentumFactor(homeLast10);
+    const awayMomentum = momentumFactor(awayLast10);
+    // Convert to a head-to-head probability adjustment
+    const momentumProbHome = clamp(
+      (homeMomentum / (homeMomentum + awayMomentum)),
+      0.35, 0.65
+    );
+    const hasMomentumData  = homeLast10 !== null && awayLast10 !== null;
+
+    // ── Blend components ─────────────────────────────────────────────────────
+    // Run model 75%, Pythagorean 20%, momentum 5% (fall back to run model if data missing)
+    const pythWeight     = hasPythData     ? 0.20 : 0;
+    const momentumWeight = hasMomentumData ? 0.05 : 0;
+    const runWeight      = 1 - pythWeight - momentumWeight;
+    const preGameProb    = clamp(
+      runWeight * runModelProbHFA +
+      pythWeight * pythProbHome +
+      momentumWeight * momentumProbHome,
+      0.01, 0.99
+    );
 
     // ── Live game adjustment ──────────────────────────────────────────────────
     let finalProb       = preGameProb;
@@ -1625,6 +2273,59 @@ export const predictGame = async (params: {
       keyFactors.push(`${homeTeamName}'s lineup projects stronger against this pitching`);
     } else if (awayData.offensiveScore > homeData.offensiveScore + 0.05) {
       keyFactors.push(`${awayTeamName}'s lineup projects stronger against this pitching`);
+    }
+
+    // Pythagorean team quality (RS/RA-based season strength)
+    if (hasPythData) {
+      const homePythPct = Math.round(homePyth * 100);
+      const awayPythPct = Math.round(awayPyth * 100);
+      if (Math.abs(homePyth - awayPyth) >= 0.06) {
+        const strongerTeam = homePyth > awayPyth ? homeTeamName : awayTeamName;
+        const strongerPct  = homePyth > awayPyth ? homePythPct : awayPythPct;
+        keyFactors.push(
+          `${strongerTeam} has the stronger season résumé by run differential (Pythagorean W%: ${strongerPct}%)`
+        );
+      }
+      if (homeRS > 0 && awayRS > 0 && Math.abs(homeRS - awayRS) >= 0.5) {
+        const higherOffense = homeRS > awayRS ? homeTeamName : awayTeamName;
+        const higherRS = homeRS > awayRS ? homeRS : awayRS;
+        keyFactors.push(`${higherOffense} ranks higher in runs scored per game (${higherRS.toFixed(2)} R/G)`);
+      }
+    }
+
+    // Team momentum (last 10 games)
+    if (hasMomentumData && homeLast10 && awayLast10) {
+      const homeL10Wins = homeLast10.wins;
+      const awayL10Wins = awayLast10.wins;
+      if (homeL10Wins >= 7 && homeL10Wins > awayL10Wins + 1) {
+        keyFactors.push(`${homeTeamName} is on a hot streak — ${homeL10Wins}-${homeLast10.losses} in their last 10 games`);
+      } else if (awayL10Wins >= 7 && awayL10Wins > homeL10Wins + 1) {
+        keyFactors.push(`${awayTeamName} is on a hot streak — ${awayL10Wins}-${awayLast10.losses} in their last 10 games`);
+      } else if (homeLast10.losses >= 7 && homeLast10.losses > awayLast10.losses + 1) {
+        keyFactors.push(`${homeTeamName} is struggling — ${homeL10Wins}-${homeLast10.losses} in their last 10 games`);
+      } else if (awayLast10.losses >= 7 && awayLast10.losses > homeLast10.losses + 1) {
+        keyFactors.push(`${awayTeamName} is struggling — ${awayL10Wins}-${awayLast10.losses} in their last 10 games`);
+      }
+    }
+
+    // FIP vs ERA note (surface when FIP meaningfully diverges from ERA — signals luck)
+    if (homeData.pitcherStats?.fip) {
+      const era = parseFloat(homeData.pitcherStats.era);
+      const fip = parseFloat(homeData.pitcherStats.fip);
+      if (era < fip - 0.60) {
+        keyFactors.push(`${homeTeamName}'s starter's ERA (${homeData.pitcherStats.era}) may be unsustainably low — FIP is ${homeData.pitcherStats.fip}`);
+      } else if (fip < era - 0.60) {
+        keyFactors.push(`${homeTeamName}'s starter pitching better than ERA suggests — FIP is ${homeData.pitcherStats.fip} vs ERA ${homeData.pitcherStats.era}`);
+      }
+    }
+    if (awayData.pitcherStats?.fip) {
+      const era = parseFloat(awayData.pitcherStats.era);
+      const fip = parseFloat(awayData.pitcherStats.fip);
+      if (era < fip - 0.60) {
+        keyFactors.push(`${awayTeamName}'s starter's ERA (${awayData.pitcherStats.era}) may be unsustainably low — FIP is ${awayData.pitcherStats.fip}`);
+      } else if (fip < era - 0.60) {
+        keyFactors.push(`${awayTeamName}'s starter pitching better than ERA suggests — FIP is ${awayData.pitcherStats.fip} vs ERA ${awayData.pitcherStats.era}`);
+      }
     }
 
     if (keyFactors.length === 0) {
