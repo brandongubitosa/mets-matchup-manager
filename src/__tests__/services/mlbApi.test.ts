@@ -194,6 +194,7 @@ describe('mlbApi', () => {
               splits: [{
                 stat: {
                   gamesPlayed: 10,
+                  plateAppearances: 28,
                   atBats: 25,
                   hits: 8,
                   doubles: 2,
@@ -230,6 +231,11 @@ describe('mlbApi', () => {
               pitchHand: { code: 'L', description: 'Left' },
             }],
           },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{ splits: [{ stat: { gamesPlayed: 100, atBats: 400, hits: 110 } }] }],
+          },
         });
 
       const result = await getBatterVsPitcher(123, 456);
@@ -239,6 +245,7 @@ describe('mlbApi', () => {
         expect(result.data.batter.fullName).toBe('Test Batter');
         expect(result.data.pitcher.fullName).toBe('Test Pitcher');
         expect(result.data.stats.atBats).toBe(25);
+        expect(result.data.stats.plateAppearances).toBe(28);
         expect(result.data.stats.hits).toBe(8);
       }
     });
@@ -251,6 +258,9 @@ describe('mlbApi', () => {
         })
         .mockResolvedValueOnce({
           data: { people: [{ id: 456, fullName: 'Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 50, atBats: 200, hits: 50 } }] }] },
         });
 
       const result = await getBatterVsPitcher(123, 456);
@@ -266,7 +276,8 @@ describe('mlbApi', () => {
       mockGet
         .mockResolvedValueOnce({ data: { stats: [] } })
         .mockResolvedValueOnce({ data: { people: [] } })
-        .mockResolvedValueOnce({ data: { people: [] } });
+        .mockResolvedValueOnce({ data: { people: [] } })
+        .mockResolvedValueOnce({ data: { stats: [] } });
 
       const result = await getBatterVsPitcher(123, 456);
 
@@ -282,6 +293,7 @@ describe('mlbApi', () => {
               splits: [{
                 stat: {
                   atBats: 10,
+                  plateAppearances: 12,
                   hits: 3,
                   doubles: 1,
                   triples: 0,
@@ -301,6 +313,9 @@ describe('mlbApi', () => {
         })
         .mockResolvedValueOnce({
           data: { people: [{ id: 2, fullName: 'P', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 80, atBats: 300, hits: 90 } }] }] },
         });
 
       const result = await getBatterVsPitcher(1, 2);
@@ -311,6 +326,7 @@ describe('mlbApi', () => {
         expect(result.data.stats.avg).toBe('.300');
         // OBP = (3+2+0)/(10+2+0+0) = 5/12 = .417
         expect(result.data.stats.obp).toBe('.417');
+        expect(result.data.stats.plateAppearances).toBe(12);
       }
     });
   });

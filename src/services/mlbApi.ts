@@ -271,6 +271,7 @@ export const getTeamBatters = async (teamId: number): Promise<RosterPlayer[]> =>
 
 interface RawMatchupStats {
   gamesPlayed?: number;
+  plateAppearances?: number;
   atBats?: number;
   hits?: number;
   doubles?: number;
@@ -282,6 +283,36 @@ interface RawMatchupStats {
   hitByPitch?: number;
   sacFlies?: number;
 }
+
+/** Sum career vs-pitcher splits (same logic as prediction lineup H2H). */
+const combineVsPlayerTotalSplits = (
+  splits: Array<{ stat?: RawMatchupStats }>
+): RawMatchupStats | null => {
+  if (splits.length === 0) return null;
+  const combined = splits.reduce((acc, split) => {
+    const s = split.stat;
+    if (!s) return acc;
+    return {
+      atBats: (acc.atBats ?? 0) + (s.atBats ?? 0),
+      plateAppearances: (acc.plateAppearances ?? 0) + (s.plateAppearances ?? 0),
+      hits: (acc.hits ?? 0) + (s.hits ?? 0),
+      doubles: (acc.doubles ?? 0) + (s.doubles ?? 0),
+      triples: (acc.triples ?? 0) + (s.triples ?? 0),
+      homeRuns: (acc.homeRuns ?? 0) + (s.homeRuns ?? 0),
+      rbi: (acc.rbi ?? 0) + (s.rbi ?? 0),
+      baseOnBalls: (acc.baseOnBalls ?? 0) + (s.baseOnBalls ?? 0),
+      hitByPitch: (acc.hitByPitch ?? 0) + (s.hitByPitch ?? 0),
+      sacFlies: (acc.sacFlies ?? 0) + (s.sacFlies ?? 0),
+      strikeOuts: (acc.strikeOuts ?? 0) + (s.strikeOuts ?? 0),
+      gamesPlayed: (acc.gamesPlayed ?? 0) + (s.gamesPlayed ?? 0),
+    };
+  }, {} as RawMatchupStats);
+
+  const totalPa = combined.plateAppearances ?? 0;
+  const totalAb = combined.atBats ?? 0;
+  if (totalPa === 0 && totalAb === 0) return null;
+  return combined;
+};
 
 const calculateStats = (stats: RawMatchupStats): MatchupStats => {
   const atBats = stats.atBats ?? 0;
@@ -301,8 +332,10 @@ const calculateStats = (stats: RawMatchupStats): MatchupStats => {
   const slg = atBats > 0 ? (totalBases / atBats).toFixed(3) : '.000';
   const opsValue = parseFloat(obp) + parseFloat(slg);
 
+  const pa = stats.plateAppearances;
   return {
     gamesPlayed: stats.gamesPlayed ?? 0,
+    ...(pa != null && pa > 0 ? { plateAppearances: pa } : {}),
     atBats,
     hits,
     doubles,
@@ -325,7 +358,7 @@ export const getBatterVsPitcher = async (
   try {
     const [matchupResponse, batterResponse, pitcherResponse, seasonResponse] = await Promise.all([
       api.get<MLBStatsResponse>(
-        `/people/${batterId}/stats?stats=vsPlayer&opposingPlayerId=${pitcherId}&group=hitting`
+        `/people/${batterId}/stats?stats=vsPlayerTotal&opposingPlayerId=${pitcherId}&group=hitting`
       ),
       api.get<MLBPlayerResponse>(`/people/${batterId}`),
       api.get<MLBPlayerResponse>(`/people/${pitcherId}`),
@@ -341,7 +374,9 @@ export const getBatterVsPitcher = async (
       return { success: false, error: 'Could not find player information' };
     }
 
-    const matchupStats = matchupResponse.data?.stats?.[0]?.splits?.[0]?.stat;
+    const matchupSplits = matchupResponse.data?.stats?.[0]?.splits ?? [];
+    const matchupCombined = combineVsPlayerTotalSplits(matchupSplits);
+    const matchupStats = matchupCombined ? calculateStats(matchupCombined) : null;
     const seasonStats = seasonResponse.data?.stats?.[0]?.splits?.[0]?.stat;
 
     const emptyStats: MatchupStats = {
@@ -379,7 +414,7 @@ export const getBatterVsPitcher = async (
           position: pitcherData.primaryPosition,
           pitchHand: pitcherData.pitchHand,
         },
-        stats: matchupStats ? calculateStats(matchupStats) : emptyStats,
+        stats: matchupStats ?? emptyStats,
         seasonStats: seasonStats ? calculateStats(seasonStats) : undefined,
       },
     };
@@ -1760,39 +1795,24 @@ const fetchBatterPredictionStats = async (
       if (ops > 0 && recentGames >= 3) recentOPS = ops;
     }
 
-    // H2H — career totals vs this pitcher (sum all season splits from vsPlayerTotal)
-    let h2hOPS    = 0;
+    // H2H — career totals vs this pitcher (same aggregation as MatchupDetail career table)
+    let h2hOPS = 0;
     let h2hAtBats = 0;
+    let h2hPlateAppearances = 0;
     const h2hSeason: number | undefined = undefined;
     if (opposingPitcherId) {
       const res = await api.get<MLBStatsResponse>(
         `/people/${batter.id}/stats?stats=vsPlayerTotal&opposingPlayerId=${opposingPitcherId}&group=hitting`
       ).catch(() => null);
       const splits = (res as { data: MLBStatsResponse } | null)?.data?.stats?.[0]?.splits ?? [];
-
-      // Sum counting stats across all seasonal splits to get career total
-      const combined = splits.reduce((acc, split) => {
-        const s = split.stat;
-        if (!s) return acc;
-        return {
-          atBats:      (acc.atBats      ?? 0) + (s.atBats      ?? 0),
-          hits:        (acc.hits        ?? 0) + (s.hits        ?? 0),
-          doubles:     (acc.doubles     ?? 0) + (s.doubles     ?? 0),
-          triples:     (acc.triples     ?? 0) + (s.triples     ?? 0),
-          homeRuns:    (acc.homeRuns    ?? 0) + (s.homeRuns    ?? 0),
-          rbi:         (acc.rbi         ?? 0) + (s.rbi         ?? 0),
-          baseOnBalls: (acc.baseOnBalls ?? 0) + (s.baseOnBalls ?? 0),
-          hitByPitch:  (acc.hitByPitch  ?? 0) + (s.hitByPitch  ?? 0),
-          sacFlies:    (acc.sacFlies    ?? 0) + (s.sacFlies    ?? 0),
-          strikeOuts:  (acc.strikeOuts  ?? 0) + (s.strikeOuts  ?? 0),
-          gamesPlayed: (acc.gamesPlayed ?? 0) + (s.gamesPlayed ?? 0),
-        };
-      }, {} as Parameters<typeof calculateStats>[0]);
-
-      if ((combined.atBats ?? 0) > 0) {
-        const calc = calculateStats(combined);
+      const combined = combineVsPlayerTotalSplits(splits);
+      if (combined) {
         h2hAtBats = combined.atBats ?? 0;
-        h2hOPS    = parseFloat(calc.ops) || 0;
+        h2hPlateAppearances = combined.plateAppearances ?? 0;
+        if (h2hAtBats > 0) {
+          const calc = calculateStats(combined);
+          h2hOPS = parseFloat(calc.ops) || 0;
+        }
       }
     }
 
@@ -1824,6 +1844,7 @@ const fetchBatterPredictionStats = async (
       recentGames: recentGames   ? recentGames  : undefined,
       h2hOPS,
       h2hAtBats,
+      h2hPlateAppearances,
       h2hSeason,
       effectiveOPS,
       platoonAdvantage: tag,
@@ -1835,6 +1856,7 @@ const fetchBatterPredictionStats = async (
       seasonOPS:   LEAGUE_AVG_OPS,
       h2hOPS:      0,
       h2hAtBats:   0,
+      h2hPlateAppearances: 0,
       effectiveOPS: LEAGUE_AVG_OPS,
       platoonAdvantage: 'neutral',
     };
