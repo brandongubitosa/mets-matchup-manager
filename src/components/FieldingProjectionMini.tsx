@@ -40,26 +40,26 @@ const DIRT_CENTROID = {
   y: (FIELD.B2.y + FIELD.B1.y + FIELD.dirtHome.y + FIELD.B3.y) / 4,
 };
 
-/** Point between 2B bag and 1B bag (2B playing closer to 1B side) */
-const B2_TOWARD_B1 = {
-  x: FIELD.B2.x + (FIELD.B1.x - FIELD.B2.x) * 0.42,
-  y: FIELD.B2.y + (FIELD.B1.y - FIELD.B2.y) * 0.42,
+/**
+ * Second baseman — shallow OF, clearly off the 2B bag (not on the “2” icon).
+ * Offset from the bag toward CF / up-the-middle, not hugging second base.
+ */
+const B2_CHIP = {
+  x: FIELD.B2.x + 5,
+  y: FIELD.B2.y - 14,
 };
-
-/** Deeper toward OF (smaller y) from a point — “further back” for middle infield */
-const OF_BACK = 5.5;
 
 /**
  * Player chips (% = viewBox). Spaced to limit overlap; C near plate; P at dirt centroid;
- * 2B toward 1B; 3B hugging 3rd base bag.
+ * 3B hugging 3rd base bag.
  */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
   { key: 'LF', x: FENCE_L.x + 11, y: FENCE_L.y - 15 },
   { key: 'CF', x: FIELD.fenceC.x, y: FIELD.fenceC.y + 2 },
   { key: 'RF', x: FENCE_R.x - 11, y: FENCE_R.y - 15 },
   { key: '3B', x: FIELD.B3.x, y: FIELD.B3.y - 3 },
-  { key: 'SS', x: 39, y: 50 },
-  { key: '2B', x: B2_TOWARD_B1.x, y: B2_TOWARD_B1.y - OF_BACK },
+  { key: 'SS', x: 36, y: 50 },
+  { key: '2B', x: B2_CHIP.x, y: B2_CHIP.y },
   { key: '1B', x: FIELD.B1.x + 5, y: FIELD.B1.y - 10 },
   { key: 'P', x: DIRT_CENTROID.x, y: DIRT_CENTROID.y },
   { key: 'C', x: FIELD.HOME.x, y: (FIELD.dirtHome.y + FIELD.HOME.y) / 2 + 1 },
