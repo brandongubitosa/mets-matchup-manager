@@ -46,17 +46,20 @@ const B2_TOWARD_B1 = {
   y: FIELD.B2.y + (FIELD.B1.y - FIELD.B2.y) * 0.42,
 };
 
+/** Deeper toward OF (smaller y) from a point — “further back” for middle infield */
+const OF_BACK = 5.5;
+
 /**
  * Player chips (% = viewBox). Spaced to limit overlap; C near plate; P at dirt centroid;
  * 2B toward 1B; 3B hugging 3rd base bag.
  */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
-  { key: 'LF', x: FENCE_L.x + 8, y: FENCE_L.y - 18 },
+  { key: 'LF', x: FENCE_L.x + 11, y: FENCE_L.y - 15 },
   { key: 'CF', x: FIELD.fenceC.x, y: FIELD.fenceC.y + 2 },
-  { key: 'RF', x: FENCE_R.x - 8, y: FENCE_R.y - 18 },
+  { key: 'RF', x: FENCE_R.x - 11, y: FENCE_R.y - 15 },
   { key: '3B', x: FIELD.B3.x, y: FIELD.B3.y - 3 },
-  { key: 'SS', x: 44, y: 50 },
-  { key: '2B', x: B2_TOWARD_B1.x, y: B2_TOWARD_B1.y },
+  { key: 'SS', x: 39, y: 50 },
+  { key: '2B', x: B2_TOWARD_B1.x, y: B2_TOWARD_B1.y - OF_BACK },
   { key: '1B', x: FIELD.B1.x + 5, y: FIELD.B1.y - 10 },
   { key: 'P', x: DIRT_CENTROID.x, y: DIRT_CENTROID.y },
   { key: 'C', x: FIELD.HOME.x, y: (FIELD.dirtHome.y + FIELD.HOME.y) / 2 + 1 },
