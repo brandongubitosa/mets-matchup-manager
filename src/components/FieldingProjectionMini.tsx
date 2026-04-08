@@ -1,31 +1,87 @@
 import React, { useId } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import Svg, { Path, Line, Circle, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import Svg, {
+  Path,
+  Line,
+  Circle,
+  Defs,
+  LinearGradient,
+  Stop,
+  Rect,
+  Text as SvgText,
+  G,
+} from 'react-native-svg';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../constants';
 import { FieldSlotPlayer } from '../utils/fieldPositions';
 
 /**
- * Slot positions (% of canvas) — match SVG diamond (B2 54, B1/B3 69, mound ~61, home ~82–88).
- * OF pulled in toward diamond; 2B nudged right (1B side); infield + C shifted up toward OF.
+ * Single coordinate system (0–100 viewBox = % of canvas). Dirt, grass, bags, and chips all derive from here.
  */
+const FIELD = {
+  VB: 100,
+  HOME: { x: 50, y: 88 },
+  R: 56,
+  fenceC: { x: 50, y: 28 },
+  /** Square dirt diamond — 2B up, 1B/3B corners, cut toward home plate */
+  B2: { x: 50, y: 54 },
+  B1: { x: 68, y: 69 },
+  B3: { x: 32, y: 69 },
+  dirtHome: { x: 50, y: 82 },
+  mound: { x: 50, y: 61 },
+} as const;
+
+const fenceK = FIELD.R / Math.SQRT2;
+const FENCE_L = { x: FIELD.HOME.x - fenceK, y: FIELD.HOME.y - fenceK };
+const FENCE_R = { x: FIELD.HOME.x + fenceK, y: FIELD.HOME.y - fenceK };
+
+/** Player chips: offsets from FIELD points so labels track the drawn diamond on every screen size */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
-  { key: 'LF', x: 22, y: 22 },
-  { key: 'CF', x: 50, y: 22 },
-  { key: 'RF', x: 78, y: 22 },
-  { key: '3B', x: 30, y: 44 },
-  { key: 'SS', x: 38, y: 38 },
-  { key: '2B', x: 56, y: 36 },
-  { key: '1B', x: 70, y: 44 },
-  { key: 'P', x: 50, y: 48 },
-  { key: 'C', x: 50, y: 62 },
+  { key: 'LF', x: FENCE_L.x + 10, y: FENCE_L.y - 14 },
+  { key: 'CF', x: FIELD.fenceC.x, y: FIELD.fenceC.y + 4 },
+  { key: 'RF', x: FENCE_R.x - 10, y: FENCE_R.y - 14 },
+  { key: '3B', x: FIELD.B3.x - 2, y: FIELD.B3.y - 12 },
+  { key: 'SS', x: 40, y: 56 },
+  { key: '2B', x: FIELD.B2.x + 5, y: FIELD.B2.y - 10 },
+  { key: '1B', x: FIELD.B1.x + 2, y: FIELD.B1.y - 12 },
+  { key: 'P', x: FIELD.mound.x, y: FIELD.mound.y - 6 },
+  { key: 'C', x: FIELD.HOME.x, y: (FIELD.mound.y + FIELD.dirtHome.y) / 2 + 2 },
   { key: 'DH', x: 14, y: 72 },
 ];
 
 const LABEL_W = 56;
 const LABEL_H = 28;
 
-const VB_W = 100;
-const VB_H = 100;
+const VB_W = FIELD.VB;
+const VB_H = FIELD.VB;
+
+/** Rotated square “bag” + number — drawn after dirt so it sits on top of grass */
+const BaseBagIcon: React.FC<{ cx: number; cy: number; n: '1' | '2' | '3' }> = ({ cx, cy, n }) => {
+  const s = 4.2;
+  return (
+    <G>
+      <Rect
+        x={cx - s / 2}
+        y={cy - s / 2}
+        width={s}
+        height={s}
+        fill="#faf6ef"
+        stroke="#3d2918"
+        strokeWidth={0.45}
+        transform={`rotate(45, ${cx}, ${cy})`}
+      />
+      <SvgText
+        x={cx}
+        y={cy + 1.35}
+        fontSize={3.2}
+        fontWeight="800"
+        fill="#2a1f12"
+        textAnchor="middle"
+      >
+        {n}
+      </SvgText>
+    </G>
+  );
+};
 
 interface FieldHalfProps {
   abbr: string;
@@ -38,27 +94,16 @@ interface FieldHalfProps {
  * https://en.wikipedia.org/wiki/Baseball_field — diagrammatic sector matches common vectors.
  */
 const BaseballFieldSvg: React.FC = () => {
-  /** SVG id must be valid in HTML; useId() can emit characters that break url(#…) on web */
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '') || 'g';
   const ofg = `${uid}-of`;
   const ifg = `${uid}-if`;
 
-  const HOME = { x: 50, y: 88 };
-  /** 90° sector endpoints (same geometry as R=56 circular arc, without buggy SVG A on RN-web) */
-  const k = 56 / Math.SQRT2;
-  const fenceL = { x: HOME.x - k, y: HOME.y - k };
-  const fenceR = { x: HOME.x + k, y: HOME.y - k };
-  /** Quadratic control — CF “peak”; reads like stock diagrams, stable across web/native */
-  const fenceC = { x: 50, y: 28 };
+  const { HOME, fenceC, B2, B1, B3, dirtHome, mound } = FIELD;
 
-  const fairSectorPath = `M ${HOME.x} ${HOME.y} L ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y} Z`;
+  const fairSectorPath = `M ${HOME.x} ${HOME.y} L ${FENCE_L.x} ${FENCE_L.y} Q ${fenceC.x} ${fenceC.y} ${FENCE_R.x} ${FENCE_R.y} Z`;
 
-  const outfieldGrassPath = `M ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y} L ${HOME.x} ${HOME.y - 22} Z`;
-
-  const B2 = { x: 50, y: 54 };
-  const B1 = { x: 68, y: 69 };
-  const B3 = { x: 32, y: 69 };
-  const dirtHome = { x: 50, y: 82 };
+  /** Brighter OF grass only under the fence arc (does not extend over the infield dirt) */
+  const outfieldGrassPath = `M ${FENCE_L.x} ${FENCE_L.y} Q ${fenceC.x} ${fenceC.y} ${FENCE_R.x} ${FENCE_R.y} L 74 38 L 26 38 Z`;
 
   return (
     <Svg
@@ -80,29 +125,29 @@ const BaseballFieldSvg: React.FC = () => {
         </LinearGradient>
       </Defs>
 
-      {/* Foul territory — full frame; corners stay dark outside the sector */}
+      {/* 1. Foul — full frame */}
       <Rect x="0" y="0" width={VB_W} height={VB_H} fill="#1e2f22" />
 
-      {/* Fair territory — sector (classic diagram: arc centered on home plate) */}
+      {/* 2. Fair grass (all grass behind dirt) */}
       <Path d={fairSectorPath} fill="url(#ifg)" />
 
-      {/* Outfield grass — brighter band under the fence arc */}
-      <Path d={outfieldGrassPath} fill={`url(#${ofg})`} opacity={0.85} />
+      {/* 3. Outfield highlight — only the wedge under the fence, above the infield */}
+      <Path d={outfieldGrassPath} fill={`url(#${ofg})`} opacity={0.9} />
 
-      {/* Skinned infield dirt (diamond) */}
+      {/* 4. Infield dirt on top of grass */}
       <Path
         d={`M ${B2.x} ${B2.y} L ${B1.x} ${B1.y} L ${dirtHome.x} ${dirtHome.y} L ${B3.x} ${B3.y} Z`}
-        fill="#d4b896"
-        stroke="rgba(120, 92, 58, 0.55)"
-        strokeWidth="0.4"
+        fill="#c9a574"
+        stroke="rgba(95, 72, 45, 0.65)"
+        strokeWidth="0.45"
       />
 
-      {/* Foul lines */}
+      {/* Foul lines — from home through 3rd / 1st toward fence */}
       <Line
         x1={HOME.x}
         y1={HOME.y}
-        x2={fenceL.x}
-        y2={fenceL.y}
+        x2={FENCE_L.x}
+        y2={FENCE_L.y}
         stroke="rgba(255,255,255,0.95)"
         strokeWidth="0.65"
         strokeLinecap="round"
@@ -110,23 +155,22 @@ const BaseballFieldSvg: React.FC = () => {
       <Line
         x1={HOME.x}
         y1={HOME.y}
-        x2={fenceR.x}
-        y2={fenceR.y}
+        x2={FENCE_R.x}
+        y2={FENCE_R.y}
         stroke="rgba(255,255,255,0.95)"
         strokeWidth="0.65"
         strokeLinecap="round"
       />
 
-      {/* Fence curve (quadratic, matches fair sector) */}
       <Path
-        d={`M ${fenceL.x} ${fenceL.y} Q ${fenceC.x} ${fenceC.y} ${fenceR.x} ${fenceR.y}`}
+        d={`M ${FENCE_L.x} ${FENCE_L.y} Q ${fenceC.x} ${fenceC.y} ${FENCE_R.x} ${FENCE_R.y}`}
         fill="none"
         stroke="rgba(20, 35, 22, 0.55)"
         strokeWidth="0.7"
         strokeLinecap="round"
       />
 
-      {/* Baselines */}
+      {/* Baselines on dirt */}
       <Path
         d={`M ${B2.x} ${B2.y} L ${B1.x} ${B1.y} M ${B1.x} ${B1.y} L ${dirtHome.x} ${dirtHome.y} M ${dirtHome.x} ${dirtHome.y} L ${B3.x} ${B3.y} M ${B3.x} ${B3.y} L ${B2.x} ${B2.y}`}
         stroke="rgba(255,255,255,0.85)"
@@ -134,26 +178,22 @@ const BaseballFieldSvg: React.FC = () => {
         fill="none"
       />
 
-      <Circle cx="50" cy="61" r="3.5" fill="#b89560" stroke="rgba(255,255,255,0.45)" strokeWidth="0.3" />
-      <Circle cx={B1.x} cy={B1.y} r="1.2" fill="#f5f0e6" opacity={0.95} />
-      <Circle cx={B2.x} cy={B2.y} r="1.3" fill="#f5f0e6" opacity={0.95} />
-      <Circle cx={B3.x} cy={B3.y} r="1.2" fill="#f5f0e6" opacity={0.95} />
+      <Circle cx={mound.x} cy={mound.y} r="3.5" fill="#b89560" stroke="rgba(255,255,255,0.45)" strokeWidth="0.3" />
+
+      {/* Base bags: numbered diamond icons on the dirt */}
+      <BaseBagIcon cx={B1.x} cy={B1.y} n="1" />
+      <BaseBagIcon cx={B2.x} cy={B2.y} n="2" />
+      <BaseBagIcon cx={B3.x} cy={B3.y} n="3" />
 
       <Rect x="0" y="88" width="20" height="11" rx="1.5" fill="rgba(0,0,0,0.14)" />
 
-      {/* Home plate — below diamond vertex */}
+      {/* Home plate — small pentagon at the point of the sector */}
       <Path
-        d="M 44 84.5 L 56 84.5 L 56.5 87.5 L 50 91.5 L 43.5 87.5 Z"
+        d="M 47.5 85.2 L 52.5 85.2 L 52.85 86.8 L 50 88.4 L 47.15 86.8 Z"
         fill="#f2ebe0"
         stroke="#5c4a32"
-        strokeWidth="0.55"
+        strokeWidth={0.4}
         strokeLinejoin="round"
-      />
-      <Path
-        d="M 45.2 85.2 L 54.8 85.2 L 55.1 87 L 50 89.8 L 44.9 87 Z"
-        fill="none"
-        stroke="rgba(255,255,255,0.5)"
-        strokeWidth="0.22"
       />
     </Svg>
   );
@@ -322,9 +362,8 @@ const styles = StyleSheet.create({
   },
   centerRule: {
     width: 1,
+    alignSelf: 'stretch',
     backgroundColor: COLORS.borderLight,
     marginHorizontal: SPACING.xs,
-    alignSelf: 'stretch',
-    minHeight: 200,
   },
 });
