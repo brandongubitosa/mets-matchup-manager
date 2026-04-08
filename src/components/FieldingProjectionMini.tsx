@@ -34,22 +34,37 @@ const fenceK = FIELD.R / Math.SQRT2;
 const FENCE_L = { x: FIELD.HOME.x - fenceK, y: FIELD.HOME.y - fenceK };
 const FENCE_R = { x: FIELD.HOME.x + fenceK, y: FIELD.HOME.y - fenceK };
 
-/** Player chips: offsets from FIELD points so labels track the drawn diamond on every screen size */
+/** Geometric center of the dirt quadrilateral (2B–1B–home–3B) — pitcher chip target */
+const DIRT_CENTROID = {
+  x: (FIELD.B2.x + FIELD.B1.x + FIELD.dirtHome.x + FIELD.B3.x) / 4,
+  y: (FIELD.B2.y + FIELD.B1.y + FIELD.dirtHome.y + FIELD.B3.y) / 4,
+};
+
+/** Point between 2B bag and 1B bag (2B playing closer to 1B side) */
+const B2_TOWARD_B1 = {
+  x: FIELD.B2.x + (FIELD.B1.x - FIELD.B2.x) * 0.42,
+  y: FIELD.B2.y + (FIELD.B1.y - FIELD.B2.y) * 0.42,
+};
+
+/**
+ * Player chips (% = viewBox). Spaced to limit overlap; C near plate; P at dirt centroid;
+ * 2B toward 1B; 3B hugging 3rd base bag.
+ */
 const SLOT_COORDS: { key: string; x: number; y: number }[] = [
-  { key: 'LF', x: FENCE_L.x + 10, y: FENCE_L.y - 14 },
-  { key: 'CF', x: FIELD.fenceC.x, y: FIELD.fenceC.y + 4 },
-  { key: 'RF', x: FENCE_R.x - 10, y: FENCE_R.y - 14 },
-  { key: '3B', x: FIELD.B3.x - 2, y: FIELD.B3.y - 12 },
-  { key: 'SS', x: 40, y: 56 },
-  { key: '2B', x: FIELD.B2.x + 5, y: FIELD.B2.y - 10 },
-  { key: '1B', x: FIELD.B1.x + 2, y: FIELD.B1.y - 12 },
-  { key: 'P', x: FIELD.mound.x, y: FIELD.mound.y - 6 },
-  { key: 'C', x: FIELD.HOME.x, y: (FIELD.mound.y + FIELD.dirtHome.y) / 2 + 2 },
-  { key: 'DH', x: 14, y: 72 },
+  { key: 'LF', x: FENCE_L.x + 8, y: FENCE_L.y - 18 },
+  { key: 'CF', x: FIELD.fenceC.x, y: FIELD.fenceC.y + 2 },
+  { key: 'RF', x: FENCE_R.x - 8, y: FENCE_R.y - 18 },
+  { key: '3B', x: FIELD.B3.x, y: FIELD.B3.y - 3 },
+  { key: 'SS', x: 44, y: 50 },
+  { key: '2B', x: B2_TOWARD_B1.x, y: B2_TOWARD_B1.y },
+  { key: '1B', x: FIELD.B1.x + 5, y: FIELD.B1.y - 10 },
+  { key: 'P', x: DIRT_CENTROID.x, y: DIRT_CENTROID.y },
+  { key: 'C', x: FIELD.HOME.x, y: (FIELD.dirtHome.y + FIELD.HOME.y) / 2 + 1 },
+  { key: 'DH', x: 12, y: 76 },
 ];
 
-const LABEL_W = 56;
-const LABEL_H = 28;
+const LABEL_W = 52;
+const LABEL_H = 26;
 
 const VB_W = FIELD.VB;
 const VB_H = FIELD.VB;
