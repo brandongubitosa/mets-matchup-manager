@@ -113,19 +113,18 @@ interface FieldHalfProps {
 }
 
 /**
- * Stock-style top view: fair territory = 90° circular sector (fence arc centered on home).
- * https://en.wikipedia.org/wiki/Baseball_field — diagrammatic sector matches common vectors.
+ * Coaching-style infield markings: bright grass, tan skin with curved cut behind 2B,
+ * white chalk (baselines, foul extensions, batter boxes), mound circle and rubber.
  */
 const BaseballFieldSvg: React.FC = () => {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '') || 'g';
-  const ofg = `${uid}-of`;
-  const ifg = `${uid}-if`;
+  const grassGrad = `${uid}-grass`;
 
-  const fairSectorPath = `M ${HOME.x} ${HOME.y} L ${FENCE_L.x} ${FENCE_L.y} Q ${FENCE_C.x} ${FENCE_C.y} ${FENCE_R.x} ${FENCE_R.y} Z`;
-
-  /** OF band only under the fence, above 2B (never paints over the square infield) */
-  const ofCutY = B2.y - 10;
-  const outfieldGrassPath = `M ${FENCE_L.x} ${FENCE_L.y} Q ${FENCE_C.x} ${FENCE_C.y} ${FENCE_R.x} ${FENCE_R.y} L 74 ${ofCutY} L 26 ${ofCutY} Z`;
+  /** Skin past the base square toward CF — arc reads like the grass edge behind the infield. */
+  const skinBulgeL = { x: B3.x - 5.5, y: B3.y - 9 };
+  const skinBulgeR = { x: B1.x + 5.5, y: B1.y - 9 };
+  const skinArcCp = { x: B2.x, y: B2.y - 13 };
+  const infieldSkinPath = `M ${HOME.x} ${HOME.y} L ${B3.x} ${B3.y} L ${skinBulgeL.x} ${skinBulgeL.y} Q ${skinArcCp.x} ${skinArcCp.y} ${skinBulgeR.x} ${skinBulgeR.y} L ${B1.x} ${B1.y} L ${HOME.x} ${HOME.y} Z`;
 
   return (
     <Svg
@@ -135,43 +134,33 @@ const BaseballFieldSvg: React.FC = () => {
       preserveAspectRatio="xMidYMid meet"
     >
       <Defs>
-        <LinearGradient id={ofg} x1="0.5" y1="0" x2="0.5" y2="1">
-          <Stop offset="0" stopColor="#5aad68" />
-          <Stop offset="0.4" stopColor="#4a8f58" />
-          <Stop offset="1" stopColor="#3d6b44" />
-        </LinearGradient>
-        <LinearGradient id={ifg} x1="0.5" y1="0.15" x2="0.5" y2="1">
-          <Stop offset="0" stopColor="#448a52" />
-          <Stop offset="0.55" stopColor="#3a6b42" />
-          <Stop offset="1" stopColor="#2d4a32" />
+        <LinearGradient id={grassGrad} x1="0.5" y1="0" x2="0.5" y2="1">
+          <Stop offset="0" stopColor="#6ec578" />
+          <Stop offset="1" stopColor="#4fa85c" />
         </LinearGradient>
       </Defs>
 
-      {/* 1. Foul — full frame */}
-      <Rect x="0" y="0" width={VB_W} height={VB_H} fill="#1e2f22" />
+      <Rect x="0" y="0" width={VB_W} height={VB_H} fill={`url(#${grassGrad})`} />
 
-      {/* 2. Fair grass (all grass behind dirt) */}
-      <Path d={fairSectorPath} fill="url(#ifg)" />
-
-      {/* 3. Outfield highlight — only the wedge under the fence, above the infield */}
-      <Path d={outfieldGrassPath} fill={`url(#${ofg})`} opacity={0.9} />
-
-      {/* 4. Infield dirt — square diamond 2B → 1B → home → 3B */}
       <Path
-        d={`M ${B2.x} ${B2.y} L ${B1.x} ${B1.y} L ${HOME.x} ${HOME.y} L ${B3.x} ${B3.y} Z`}
-        fill="#c9a574"
-        stroke="rgba(95, 72, 45, 0.65)"
-        strokeWidth="0.45"
+        d={`M ${FENCE_L.x} ${FENCE_L.y} Q ${FENCE_C.x} ${FENCE_C.y} ${FENCE_R.x} ${FENCE_R.y} L 78 ${B2.y - 16} L 22 ${B2.y - 16} Z`}
+        fill="rgba(80, 170, 95, 0.45)"
       />
 
-      {/* Foul lines — from home through 3rd / 1st toward fence */}
+      <Path
+        d={infieldSkinPath}
+        fill="#d4b483"
+        stroke="rgba(120, 90, 55, 0.55)"
+        strokeWidth="0.4"
+      />
+
       <Line
         x1={HOME.x}
         y1={HOME.y}
         x2={FENCE_L.x}
         y2={FENCE_L.y}
-        stroke="rgba(255,255,255,0.95)"
-        strokeWidth="0.65"
+        stroke="#f5f8fa"
+        strokeWidth="0.7"
         strokeLinecap="round"
       />
       <Line
@@ -179,42 +168,61 @@ const BaseballFieldSvg: React.FC = () => {
         y1={HOME.y}
         x2={FENCE_R.x}
         y2={FENCE_R.y}
-        stroke="rgba(255,255,255,0.95)"
-        strokeWidth="0.65"
+        stroke="#f5f8fa"
+        strokeWidth="0.7"
         strokeLinecap="round"
       />
 
       <Path
         d={`M ${FENCE_L.x} ${FENCE_L.y} Q ${FENCE_C.x} ${FENCE_C.y} ${FENCE_R.x} ${FENCE_R.y}`}
         fill="none"
-        stroke="rgba(20, 35, 22, 0.55)"
-        strokeWidth="0.7"
+        stroke="rgba(255,255,255,0.35)"
+        strokeWidth="0.55"
         strokeLinecap="round"
       />
 
-      {/* Baselines — square diamond edges */}
       <Path
         d={`M ${B2.x} ${B2.y} L ${B1.x} ${B1.y} M ${B1.x} ${B1.y} L ${HOME.x} ${HOME.y} M ${HOME.x} ${HOME.y} L ${B3.x} ${B3.y} M ${B3.x} ${B3.y} L ${B2.x} ${B2.y}`}
-        stroke="rgba(255,255,255,0.85)"
-        strokeWidth="0.5"
+        stroke="#f5f8fa"
+        strokeWidth="0.55"
         fill="none"
+        strokeLinecap="round"
       />
 
-      <Circle cx={MOUND.x} cy={MOUND.y} r="3.2" fill="#b89560" stroke="rgba(255,255,255,0.45)" strokeWidth="0.3" />
+      <Circle cx={MOUND.x} cy={MOUND.y} r="4.2" fill="#c9a06a" stroke="#f5f8fa" strokeWidth="0.35" />
+      <Rect x={MOUND.x - 0.9} y={MOUND.y - 2.4} width="1.8" height="1.15" rx="0.15" fill="#f2ebe0" />
 
-      {/* Base bags: numbered diamond icons on the dirt */}
       <BaseBagIcon cx={B1.x} cy={B1.y} n="1" />
       <BaseBagIcon cx={B2.x} cy={B2.y} n="2" />
       <BaseBagIcon cx={B3.x} cy={B3.y} n="3" />
 
-      <Rect x="0" y={HOME.y - 2} width="20" height="11" rx="1.5" fill="rgba(0,0,0,0.14)" />
+      <Rect
+        x={HOME.x - 8.6}
+        y={HOME.y - 9}
+        width="5.2"
+        height="7.6"
+        rx="0.35"
+        fill="none"
+        stroke="#f5f8fa"
+        strokeWidth="0.45"
+      />
+      <Rect
+        x={HOME.x + 3.4}
+        y={HOME.y - 9}
+        width="5.2"
+        height="7.6"
+        rx="0.35"
+        fill="none"
+        stroke="#f5f8fa"
+        strokeWidth="0.45"
+      />
+      <Rect x="0" y={HOME.y - 2} width="20" height="11" rx="1.5" fill="rgba(0,0,0,0.12)" />
 
-      {/* Home plate — pentagon with tip toward catcher (+y, bottom of view) */}
       <Path
         d={`M ${HOME.x - 2.3} ${HOME.y - 1.2} L ${HOME.x + 2.3} ${HOME.y - 1.2} L ${HOME.x + 2.6} ${HOME.y + 0.3} L ${HOME.x} ${HOME.y + 1.6} L ${HOME.x - 2.6} ${HOME.y + 0.3} Z`}
         fill="#f2ebe0"
-        stroke="#5c4a32"
-        strokeWidth={0.38}
+        stroke="#f0f4f7"
+        strokeWidth={0.4}
         strokeLinejoin="round"
       />
     </Svg>
@@ -317,7 +325,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
-    backgroundColor: '#2d5a36',
+    backgroundColor: '#4fa85c',
   },
   canvas: {
     width: '100%',
