@@ -90,7 +90,7 @@ const SLOT_COORDS: { key: string; x: number; y: number }[] = [
   { key: 'DH', x: 12, y: 76 },
 ];
 
-/** Wider chips + larger type so names stay legible on phones. */
+/** Base chip dimensions — will be scaled down on small canvases. */
 const LABEL_W = 72;
 const LABEL_H = 36;
 
@@ -258,59 +258,92 @@ const FieldHalf: React.FC<FieldHalfProps> = ({
   onPlayerPress,
   stackVertically,
   diagramSidePx,
-}) => (
-  <View style={[styles.half, stackVertically && styles.halfStacked]}>
-    <Text style={styles.teamAbbr}>{abbr}</Text>
-    {/* Outer shell: overflow visible so labels are not clipped; inner clips only the SVG */}
-    <View
-      style={[
-        styles.fieldShell,
-        diagramSidePx != null &&
-          diagramSidePx > 0 && { width: diagramSidePx, alignSelf: 'center' },
-      ]}
-    >
+}) => {
+  const [layoutPx, setLayoutPx] = useState({ w: 0, h: 0 });
+
+  // When an explicit square size is provided (stacked mode), use it directly so
+  // chips are positioned correctly even before the first layout event fires.
+  const canvasW = diagramSidePx != null && diagramSidePx > 0 ? diagramSidePx : layoutPx.w;
+  const canvasH = diagramSidePx != null && diagramSidePx > 0 ? diagramSidePx : layoutPx.h;
+
+  // Scale chip width proportionally to canvas — ~21% of canvas width,
+  // clamped to [48, 72] px so names stay readable without overlapping.
+  const chipW = canvasW > 0 ? Math.max(48, Math.min(LABEL_W, Math.round(canvasW * 0.21))) : LABEL_W;
+  const chipH = Math.round(chipW * (LABEL_H / LABEL_W));
+  const nameFontSize = chipW < 60 ? FONT_SIZE.xs : FONT_SIZE.sm;
+
+  return (
+    <View style={[styles.half, stackVertically && styles.halfStacked]}>
+      <Text style={styles.teamAbbr}>{abbr}</Text>
+      {/* Outer shell: overflow visible so labels are not clipped; inner clips only the SVG */}
       <View
         style={[
-          styles.canvasBase,
-          diagramSidePx != null && diagramSidePx > 0
-            ? { width: diagramSidePx, height: diagramSidePx }
-            : styles.canvasFluid,
+          styles.fieldShell,
+          diagramSidePx != null &&
+            diagramSidePx > 0 && { width: diagramSidePx, alignSelf: 'center' },
         ]}
       >
-        <View style={styles.svgClip} pointerEvents="none">
-          <BaseballFieldSvg />
+        <View
+          style={[
+            styles.canvasBase,
+            diagramSidePx != null && diagramSidePx > 0
+              ? { width: diagramSidePx, height: diagramSidePx }
+              : styles.canvasFluid,
+          ]}
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            if (width > 0 && height > 0) {
+              setLayoutPx({ w: width, h: height });
+            }
+          }}
+        >
+          <View style={styles.svgClip} pointerEvents="none">
+            <BaseballFieldSvg />
+          </View>
+          {/* Only render chips once canvas dimensions are known — avoids a
+              misaligned first frame and fixes the web aspect-ratio + absolute
+              percentage positioning bug. */}
+          {canvasW > 0 && SLOT_COORDS.map(({ key, x, y }) => {
+            const p = fieldMap.get(key);
+            // Convert viewBox coords (0–100) to canvas pixels, then offset by
+            // half the chip size to centre it on the coordinate.
+            const slotLeft = (x / 100) * canvasW - chipW / 2;
+            const slotTop  = (y / 100) * canvasH - chipH / 2;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.slot,
+                  {
+                    left: slotLeft,
+                    top: slotTop,
+                    width: chipW,
+                    maxWidth: chipW,
+                    minHeight: chipH,
+                  },
+                ]}
+                disabled={!p || !onPlayerPress}
+                onPress={() => p && onPlayerPress?.(p.playerId)}
+                activeOpacity={0.75}
+                accessibilityRole={p && onPlayerPress ? 'button' : undefined}
+                accessibilityLabel={p ? `${key} ${p.lastName}` : `${key} empty`}
+              >
+                <Text style={styles.slotKey}>{key}</Text>
+                <Text
+                  style={[styles.slotName, { fontSize: nameFontSize }]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {p?.lastName ?? '—'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        {SLOT_COORDS.map(({ key, x, y }) => {
-          const p = fieldMap.get(key);
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.slot,
-                {
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  marginLeft: -LABEL_W / 2,
-                  marginTop: -LABEL_H / 2,
-                },
-              ]}
-              disabled={!p || !onPlayerPress}
-              onPress={() => p && onPlayerPress?.(p.playerId)}
-              activeOpacity={0.75}
-              accessibilityRole={p && onPlayerPress ? 'button' : undefined}
-              accessibilityLabel={p ? `${key} ${p.lastName}` : `${key} empty`}
-            >
-              <Text style={styles.slotKey}>{key}</Text>
-              <Text style={styles.slotName} numberOfLines={2} ellipsizeMode="tail">
-                {p?.lastName ?? '—'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 interface FieldingProjectionMiniProps {
   myAbbr: string;
@@ -431,9 +464,6 @@ const styles = StyleSheet.create({
   },
   slot: {
     position: 'absolute',
-    width: LABEL_W,
-    minHeight: LABEL_H,
-    maxWidth: LABEL_W,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
@@ -462,12 +492,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   slotName: {
-    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    maxWidth: LABEL_W - 8,
-    lineHeight: FONT_SIZE.sm + 3,
   },
   centerRule: {
     width: 1,
