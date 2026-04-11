@@ -164,7 +164,7 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <LinearGradient colors={['#E8B4A8', '#D4A574']} style={styles.topStripe}>
+      <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.topStripe}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow}>
           <Text style={styles.backText}>{'< Back'}</Text>
         </TouchableOpacity>
@@ -185,7 +185,7 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
       ) : (
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, splitRow && styles.scrollContentWide]}
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.cardOuter, splitRow && styles.cardOuterRow]}>
@@ -355,29 +355,29 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
 
 const tableStyles = StyleSheet.create({
   wrap: {
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
   },
   title: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '800',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-    letterSpacing: 0.3,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.5,
   },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.xs,
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   cell: {
-    minWidth: 52,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    minWidth: 56,
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: COLORS.borderLight,
   },
   cellLabel: {
     fontSize: 9,
@@ -395,18 +395,23 @@ const tableStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#C8E6C9',
+    backgroundColor: COLORS.background,
   },
   topStripe: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
+    paddingBottom: SPACING.md,
   },
   backRow: {
-    paddingTop: SPACING.xs,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: SPACING.xs + 2,
+    marginTop: SPACING.xs,
   },
   backText: {
-    color: COLORS.textPrimary,
-    fontSize: FONT_SIZE.base,
+    color: COLORS.white,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
   },
   scroll: {
@@ -416,12 +421,17 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     paddingBottom: SPACING.xxl,
   },
+  scrollContentWide: {
+    width: '100%',
+    maxWidth: 960,
+    alignSelf: 'center',
+  },
   cardOuter: {
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#2E7D32',
-    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    backgroundColor: COLORS.white,
     ...SHADOW.md,
   },
   cardOuterRow: {
@@ -430,37 +440,35 @@ const styles = StyleSheet.create({
   statsPanel: {
     padding: SPACING.md,
     flex: 1,
+    backgroundColor: '#FCFDFE',
   },
   statsPanelSplit: {
     flex: 1.15,
     maxWidth: '58%',
   },
   marbleHeader: {
-    borderBottomWidth: 2,
+    borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.08)',
-    paddingBottom: SPACING.sm,
-    marginBottom: SPACING.xs,
+    paddingBottom: SPACING.sm + 2,
+    marginBottom: SPACING.sm,
   },
   cardNo: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '900',
-    color: '#F9A825',
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 0,
+    color: COLORS.secondary,
   },
   nameBlock: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '900',
     color: COLORS.textPrimary,
-    letterSpacing: 0.5,
+    letterSpacing: 0.35,
     marginTop: SPACING.xs,
   },
   bioLine: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
     marginTop: 4,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   photoPanel: {
     minHeight: 220,
@@ -488,8 +496,8 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   actions: {
-    marginTop: SPACING.lg,
-    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    gap: SPACING.md,
   },
   primaryBtn: {
     borderRadius: RADIUS.md,
@@ -518,7 +526,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.borderLight,
+    borderColor: 'rgba(0,45,114,0.16)',
     ...SHADOW.sm,
   },
   secondaryBtnText: {
