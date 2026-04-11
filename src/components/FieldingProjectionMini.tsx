@@ -1,5 +1,5 @@
-import React, { useId } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { useId, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions, LayoutChangeEvent } from 'react-native';
 import Svg, {
   Path,
   Line,
@@ -53,8 +53,11 @@ const FENCE_L = { x: HOME.x - fenceK, y: HOME.y - fenceK };
 const FENCE_R = { x: HOME.x + fenceK, y: HOME.y - fenceK };
 const FENCE_C = { x: 50, y: 26 };
 
-/** Second baseman — shallow OF, off the 2 bag */
-const B2_CHIP = { x: B2.x + 4, y: B2.y - 10 };
+/**
+ * Second baseman — up the middle, shaded toward 1B at normal depth (infield dirt),
+ * not shallow CF. Prior chip was too far up (toward OF) and read “wrong” vs SS.
+ */
+const B2_CHIP = { x: B2.x + 6, y: B2.y + 5 };
 
 /**
  * Player chips (% = viewBox), aligned to square-diamond geometry.
@@ -113,6 +116,8 @@ interface FieldHalfProps {
   fieldMap: Map<string, FieldSlotPlayer>;
   onPlayerPress?: (playerId: number) => void;
   stackVertically: boolean;
+  /** When set, diagram is a centered square of this side (px); otherwise width 100% + aspect ratio. */
+  diagramSidePx?: number;
 }
 
 /**
@@ -232,12 +237,31 @@ const BaseballFieldSvg: React.FC = () => {
   );
 };
 
-const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress, stackVertically }) => (
+const FieldHalf: React.FC<FieldHalfProps> = ({
+  abbr,
+  fieldMap,
+  onPlayerPress,
+  stackVertically,
+  diagramSidePx,
+}) => (
   <View style={[styles.half, stackVertically && styles.halfStacked]}>
     <Text style={styles.teamAbbr}>{abbr}</Text>
     {/* Outer shell: overflow visible so labels are not clipped; inner clips only the SVG */}
-    <View style={styles.fieldShell}>
-      <View style={styles.canvas}>
+    <View
+      style={[
+        styles.fieldShell,
+        diagramSidePx != null &&
+          diagramSidePx > 0 && { width: diagramSidePx, alignSelf: 'center' },
+      ]}
+    >
+      <View
+        style={[
+          styles.canvasBase,
+          diagramSidePx != null && diagramSidePx > 0
+            ? { width: diagramSidePx, height: diagramSidePx }
+            : styles.canvasFluid,
+        ]}
+      >
         <View style={styles.svgClip} pointerEvents="none">
           <BaseballFieldSvg />
         </View>
@@ -293,14 +317,30 @@ export const FieldingProjectionMini: React.FC<FieldingProjectionMiniProps> = ({
   opponentTeamName,
 }) => {
   const { isCompact } = useResponsiveLayout();
+  const { width: winW, height: winH } = useWindowDimensions();
   const stackVertically = isCompact;
+  const [containerW, setContainerW] = useState(0);
+
+  const onRowLayout = useCallback((e: LayoutChangeEvent) => {
+    setContainerW(e.nativeEvent.layout.width);
+  }, []);
+
+  /**
+   * Stacked: cap each diamond so two fields fit in the card. Use window width until
+   * layout reports the real row width (card is often narrower than the screen).
+   */
+  const rowW = containerW > 0 ? containerW : winW * 0.88;
+  const stackedDiagramSide = stackVertically
+    ? Math.min(rowW * 0.98, winH * 0.24, 260)
+    : undefined;
 
   return (
-    <View style={[styles.row, stackVertically && styles.rowStacked]}>
+    <View style={[styles.row, stackVertically && styles.rowStacked]} onLayout={onRowLayout}>
       <FieldHalf
         abbr={myAbbr}
         fieldMap={myFieldMap}
         stackVertically={stackVertically}
+        diagramSidePx={stackedDiagramSide}
         onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
       />
       <View style={[styles.centerRule, stackVertically && styles.centerRuleStacked]} />
@@ -308,6 +348,7 @@ export const FieldingProjectionMini: React.FC<FieldingProjectionMiniProps> = ({
         abbr={oppAbbr}
         fieldMap={oppFieldMap}
         stackVertically={stackVertically}
+        diagramSidePx={stackedDiagramSide}
         onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
       />
     </View>
@@ -346,9 +387,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderLight,
     backgroundColor: '#4fa85c',
   },
-  canvas: {
-    width: '100%',
-    aspectRatio: VB_W / VB_H,
+  canvasBase: {
+    maxWidth: '100%',
     position: 'relative',
     ...Platform.select({
       web: {
@@ -357,6 +397,10 @@ const styles = StyleSheet.create({
       },
       default: {},
     }),
+  },
+  canvasFluid: {
+    width: '100%',
+    aspectRatio: VB_W / VB_H,
   },
   /** Clips only the grass graphic to rounded corners; labels sit above in canvas */
   svgClip: {
