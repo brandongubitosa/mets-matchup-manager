@@ -568,11 +568,11 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
   },
   fieldSectionHint: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xs,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   projectedBanner: {
     backgroundColor: `${COLORS.secondary}18`,

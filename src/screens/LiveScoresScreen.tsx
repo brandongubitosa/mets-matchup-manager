@@ -261,6 +261,10 @@ const LiveGameCard: React.FC<{
             </View>
           </View>
         )}
+        <View style={styles.tapHintRow}>
+          <Text style={styles.tapHintText}>Open matchup details</Text>
+          <Text style={styles.tapHintArrow}>›</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -326,6 +330,7 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
             Updated {formatLastUpdated(lastUpdated)}
           </Text>
         )}
+        <Text style={styles.headerHint}>Tap a game to open prediction and matchup details</Text>
       </LinearGradient>
 
       {/* Content */}
@@ -462,6 +467,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xs,
   },
+  headerHint: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+  },
 
   // Loading / Error / Empty
   loadingContainer: {
@@ -536,7 +547,7 @@ const styles = StyleSheet.create({
   // Game Card
   gameCard: {
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl,
     overflow: 'hidden',
     ...SHADOW.sm,
   },
@@ -549,7 +560,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   gameCardInner: {
-    padding: SPACING.md,
+    padding: SPACING.md + 2,
   },
 
   // Game header
@@ -634,12 +645,12 @@ const styles = StyleSheet.create({
 
   // Scoreboard
   scoreboard: {
-    gap: SPACING.sm,
+    gap: SPACING.sm + 2,
   },
   teamRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.sm + 2,
   },
   teamName: {
     fontSize: FONT_SIZE.base,
@@ -665,7 +676,7 @@ const styles = StyleSheet.create({
   },
   score: {
     fontSize: FONT_SIZE.xxl,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textSecondary,
     minWidth: 32,
     textAlign: 'right',
@@ -716,6 +727,25 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
+  },
+  tapHintRow: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tapHintText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  tapHintArrow: {
+    fontSize: FONT_SIZE.lg,
+    color: COLORS.primary,
+    fontWeight: '800',
   },
   rheHeader: {
     flexDirection: 'row',
