@@ -100,7 +100,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         <View style={styles.headerTextGroup}>
           <Text style={styles.heroTitle}>{selectedTeam.abbreviation}</Text>
-          <Text style={styles.heroSubtitle}>Matchup Manager</Text>
+          <Text style={styles.heroSubtitle} numberOfLines={1}>
+            {selectedTeam.name} · Matchup Manager
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -188,8 +190,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   <Text style={styles.liveBadgeText}>LIVE</Text>
                 </View>
               ) : null}
-              <Text style={styles.quickBoxTitle}>Scoreboard</Text>
-              <Text style={styles.quickBoxArrow}>›</Text>
+              <Text style={styles.quickBoxEyebrow}>
+                {hasLiveGames ? 'In progress now' : 'Today'}
+              </Text>
+              <Text style={styles.quickBoxTitle}>Live Scores</Text>
+              <Text style={styles.quickBoxSubtitle}>Tap any game for details</Text>
+              <View style={styles.quickBoxArrowWrap}>
+                <Text style={styles.quickBoxArrow}>›</Text>
+              </View>
             </LinearGradient>
           </AnimatedCard>
 
@@ -212,8 +220,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
+              <Text style={styles.quickBoxEyebrow}>Hitters</Text>
               <Text style={styles.quickBoxTitle}>Batters</Text>
-              <Text style={styles.quickBoxArrow}>›</Text>
+              <Text style={styles.quickBoxSubtitle}>Splits, matchups, trends</Text>
+              <View style={styles.quickBoxArrowWrap}>
+                <Text style={styles.quickBoxArrow}>›</Text>
+              </View>
             </LinearGradient>
           </AnimatedCard>
 
@@ -236,8 +248,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
+              <Text style={styles.quickBoxEyebrow}>Arsenal</Text>
               <Text style={styles.quickBoxTitle}>Pitchers</Text>
-              <Text style={styles.quickBoxArrow}>›</Text>
+              <Text style={styles.quickBoxSubtitle}>Fatigue, form, edges</Text>
+              <View style={styles.quickBoxArrowWrap}>
+                <Text style={styles.quickBoxArrow}>›</Text>
+              </View>
             </LinearGradient>
           </AnimatedCard>
         </View>
@@ -335,7 +351,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.sm + 2,
+    paddingVertical: SPACING.md - 2,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
   },
@@ -351,9 +367,9 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: FONT_SIZE.xs,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.8)',
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   changeTeamPill: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -394,18 +410,38 @@ const styles = StyleSheet.create({
   },
   quickBox: {
     borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    minHeight: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    padding: SPACING.sm + 2,
+    minHeight: 108,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 2,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  quickBoxEyebrow: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.78)',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   quickBoxTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FONT_SIZE.base,
     fontWeight: '800',
     color: COLORS.white,
-    textAlign: 'center',
+    textAlign: 'left',
+    lineHeight: FONT_SIZE.base + 1,
+  },
+  quickBoxSubtitle: {
+    fontSize: FONT_SIZE.xs,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+    lineHeight: FONT_SIZE.xs + 3,
+  },
+  quickBoxArrowWrap: {
+    width: '100%',
+    alignItems: 'flex-end',
   },
   quickBoxArrow: {
     fontSize: FONT_SIZE.lg,
