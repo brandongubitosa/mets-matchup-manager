@@ -27,6 +27,7 @@ import {
   TeamBullpenStatus,
 } from '../types';
 import { METS_TEAM_ID } from '../constants';
+import { isGameInProgress } from '../utils/liveGame';
 import { withCacheAndDedupe, invalidateCacheKey } from './apiCache';
 
 const BASE_URL = 'https://statsapi.mlb.com/api/v1';
@@ -1492,15 +1493,15 @@ export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
           `/schedule?sportId=1&date=${today}&hydrate=linescore,team,probablePitcher`
         );
 
-        const dates = response.data?.dates;
-        if (!dates || dates.length === 0) {
-          return { success: true, data: [] };
-        }
-
         interface ScheduleGame {
           gamePk: number;
           gameDate: string;
-          status: { abstractGameState: string; detailedState: string; statusCode: string };
+          status: {
+            abstractGameState: string;
+            detailedState: string;
+            statusCode: string;
+            codedGameState?: string;
+          };
           teams: {
             home: {
               team: { id: number; name: string };
@@ -1517,6 +1518,7 @@ export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
             currentInning?: number;
             currentInningOrdinal?: string;
             isTopInning?: boolean;
+            inningHalf?: string;
             outs?: number;
             teams?: {
               home?: { runs?: number; hits?: number; errors?: number };
@@ -1525,11 +1527,32 @@ export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
           };
         }
 
-        const games: LiveGame[] = (dates[0].games as ScheduleGame[]).map((g) => {
+        const parseInningHalf = (
+          ls: ScheduleGame['linescore']
+        ): 'top' | 'bottom' | null => {
+          if (!ls) return null;
+          if (ls.isTopInning === true) return 'top';
+          if (ls.isTopInning === false) return 'bottom';
+          const half = ls.inningHalf?.toLowerCase();
+          if (half === 'top') return 'top';
+          if (half === 'bottom') return 'bottom';
+          return null;
+        };
+
+        const dates = response.data?.dates ?? [];
+        const scheduleGames: ScheduleGame[] = dates.flatMap(
+          (d: { games?: ScheduleGame[] }) => d.games ?? []
+        );
+        if (scheduleGames.length === 0) {
+          return { success: true, data: [] };
+        }
+
+        const games: LiveGame[] = scheduleGames.map((g) => {
           const ls = g.linescore;
           return {
             gamePk: g.gamePk,
             gameDate: g.gameDate,
+            codedGameState: g.status.codedGameState,
             status: g.status,
             homeTeam: { id: g.teams.home.team.id, name: g.teams.home.team.name },
             awayTeam: { id: g.teams.away.team.id, name: g.teams.away.team.name },
@@ -1541,7 +1564,7 @@ export const getLiveScores = async (): Promise<ApiResult<LiveGame[]>> => {
             awayErrors: ls?.teams?.away?.errors ?? 0,
             currentInning: ls?.currentInning ?? null,
             currentInningOrdinal: ls?.currentInningOrdinal ?? null,
-            inningHalf: ls?.isTopInning === true ? 'top' : ls?.isTopInning === false ? 'bottom' : null,
+            inningHalf: parseInningHalf(ls),
             outs: ls?.outs ?? null,
             homeProbablePitcher: g.teams.home.probablePitcher?.id
               ? { id: g.teams.home.probablePitcher.id, fullName: g.teams.home.probablePitcher.fullName }
@@ -2200,7 +2223,7 @@ export const predictGame = async (params: {
     if (liveScoresResult.success) {
       const liveGame = liveScoresResult.data.find(
         (g) =>
-          g.status.abstractGameState === 'Live' &&
+          isGameInProgress(g) &&
           ((g.homeTeam.id === homeTeamId && g.awayTeam.id === awayTeamId) ||
            (g.homeTeam.id === awayTeamId && g.awayTeam.id === homeTeamId))
       );

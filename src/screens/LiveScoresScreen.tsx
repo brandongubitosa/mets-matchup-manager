@@ -15,6 +15,13 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../consta
 import { LiveScoresScreenNavigationProp, LiveScoresScreenRouteProp, LiveGame } from '../types';
 import { useLiveScores } from '../hooks/useLiveScores';
 import { TeamLogo } from '../components';
+import {
+  buildGamePredictionRouteParams,
+  isGameFinal,
+  isGameInProgress,
+  isScoreboardStarted,
+  liveGameSortOrder,
+} from '../utils/liveGame';
 
 type LiveScoresScreenProps = {
   navigation: LiveScoresScreenNavigationProp;
@@ -58,6 +65,9 @@ const PulsingDot: React.FC = () => {
 
 const InningIndicator: React.FC<{ game: LiveGame }> = ({ game }) => {
   const isTop = game.inningHalf === 'top';
+  const inningLabel =
+    game.currentInningOrdinal ??
+    (game.currentInning != null ? `${game.currentInning}` : '');
   return (
     <View style={styles.inningContainer}>
       <View style={styles.inningArrows}>
@@ -68,7 +78,7 @@ const InningIndicator: React.FC<{ game: LiveGame }> = ({ game }) => {
           {'\u25BC'}
         </Text>
       </View>
-      <Text style={styles.inningText}>{game.currentInning}</Text>
+      <Text style={styles.inningText}>{inningLabel}</Text>
     </View>
   );
 };
@@ -82,10 +92,9 @@ const OutIndicator: React.FC<{ outs: number }> = ({ outs }) => (
 );
 
 const GameStatusBadge: React.FC<{ game: LiveGame }> = ({ game }) => {
-  const state = game.status.abstractGameState;
   const detail = game.status.detailedState;
 
-  if (state === 'Live') {
+  if (isGameInProgress(game)) {
     return (
       <View style={[styles.statusBadge, styles.statusLive]}>
         <PulsingDot />
@@ -94,7 +103,7 @@ const GameStatusBadge: React.FC<{ game: LiveGame }> = ({ game }) => {
     );
   }
 
-  if (state === 'Final') {
+  if (isGameFinal(game)) {
     return (
       <View style={[styles.statusBadge, styles.statusFinal]}>
         <Text style={styles.statusFinalText}>FINAL</Text>
@@ -120,15 +129,16 @@ const GameStatusBadge: React.FC<{ game: LiveGame }> = ({ game }) => {
 const LiveGameCard: React.FC<{
   game: LiveGame;
   isHighlighted: boolean;
+  onGamePress: () => void;
   onProbablePitcherPress?: (payload: {
     playerId: number;
     opponentTeamId: number;
     opponentTeamName: string;
   }) => void;
-}> = ({ game, isHighlighted, onProbablePitcherPress }) => {
-  const isLive = game.status.abstractGameState === 'Live';
-  const isFinal = game.status.abstractGameState === 'Final';
-  const hasStarted = isLive || isFinal;
+}> = ({ game, isHighlighted, onGamePress, onProbablePitcherPress }) => {
+  const isLive = isGameInProgress(game);
+  const isFinal = isGameFinal(game);
+  const hasStarted = isScoreboardStarted(game);
 
   const awayAbbr = MLB_TEAMS[game.awayTeam.id]?.abbreviation ?? '???';
   const homeAbbr = MLB_TEAMS[game.homeTeam.id]?.abbreviation ?? '???';
@@ -137,7 +147,14 @@ const LiveGameCard: React.FC<{
   const homeWinning = hasStarted && game.homeScore > game.awayScore;
 
   return (
-    <View style={[styles.gameCard, isHighlighted && styles.gameCardHighlighted]}>
+    <TouchableOpacity
+      style={[styles.gameCard, isHighlighted && styles.gameCardHighlighted]}
+      onPress={onGamePress}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityHint="Opens prediction, lineups, and matchup details for this game"
+      accessibilityLabel={`${awayAbbr} at ${homeAbbr}. Tap for matchup details.`}
+    >
       {isHighlighted && <View style={styles.highlightStripe} />}
 
       <View style={styles.gameCardInner}>
@@ -245,7 +262,7 @@ const LiveGameCard: React.FC<{
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -260,9 +277,8 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
   }, [refetch]);
 
   const sortedGames = [...games].sort((a, b) => {
-    const stateOrder: Record<string, number> = { Live: 0, Preview: 2, Final: 3 };
-    const aOrder = stateOrder[a.status.abstractGameState] ?? 1;
-    const bOrder = stateOrder[b.status.abstractGameState] ?? 1;
+    const aOrder = liveGameSortOrder(a);
+    const bOrder = liveGameSortOrder(b);
     if (aOrder !== bOrder) return aOrder - bOrder;
 
     const aHighlight = a.homeTeam.id === highlightTeamId || a.awayTeam.id === highlightTeamId;
@@ -290,7 +306,7 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
               <View style={styles.liveIndicator}>
                 <PulsingDot />
                 <Text style={styles.liveCountText}>
-                  {games.filter((g) => g.status.abstractGameState === 'Live').length} live
+                  {games.filter(isGameInProgress).length} live
                 </Text>
               </View>
             )}
@@ -350,6 +366,12 @@ export const LiveScoresScreen: React.FC<LiveScoresScreenProps> = ({ navigation, 
               game={item}
               isHighlighted={
                 item.homeTeam.id === highlightTeamId || item.awayTeam.id === highlightTeamId
+              }
+              onGamePress={() =>
+                navigation.navigate(
+                  'GamePrediction',
+                  buildGamePredictionRouteParams(item, highlightTeamId)
+                )
               }
               onProbablePitcherPress={({ playerId, opponentTeamId, opponentTeamName }) =>
                 navigation.navigate('PlayerBackCard', {
@@ -623,7 +645,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    width: 40,
+    minWidth: 44,
+    maxWidth: 72,
   },
   teamNameWinning: {
     color: COLORS.textPrimary,
@@ -663,8 +686,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inningArrow: {
-    fontSize: 6,
-    lineHeight: 8,
+    fontSize: 10,
+    lineHeight: 12,
     color: COLORS.lightGray,
   },
   inningArrowActive: {

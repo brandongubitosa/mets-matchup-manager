@@ -19,6 +19,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
 import { usePersistedTeam, useResponsiveLayout } from '../hooks';
 import { getLiveScores } from '../services/mlbApi';
+import { isGameInProgress } from '../utils/liveGame';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
 
 const HOME_LIVE_POLL_MS = 30_000;
@@ -55,7 +56,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const tick = async () => {
       const result = await getLiveScores();
       if (cancelled || !result.success) return;
-      setHasLiveGames(result.data.some((g) => g.status.abstractGameState === 'Live'));
+      setHasLiveGames(result.data.some(isGameInProgress));
     };
 
     tick();

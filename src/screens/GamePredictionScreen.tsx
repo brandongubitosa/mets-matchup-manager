@@ -453,7 +453,7 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
     fetchWeather();
     fetchUmpire();
     return () => { cancelled = true; };
-  }, [homeTeamId, awayTeamId, homePitcherId, awayPitcherId, retryKey]);
+  }, [homeTeamId, awayTeamId, homePitcherId, awayPitcherId, gameId, retryKey]);
 
   if (loading) {
     return (

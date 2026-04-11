@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { LiveGame } from '../types';
 import { getLiveScores, invalidateLiveScoresCache } from '../services/mlbApi';
+import { isGameInProgress } from '../utils/liveGame';
 
 const POLL_INTERVAL_LIVE = 30_000;
 const POLL_INTERVAL_IDLE = 120_000;
@@ -24,9 +25,7 @@ export const useLiveScores = (): UseLiveScoresReturn => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
 
-  const hasLiveGames = games.some(
-    (g) => g.status.abstractGameState === 'Live'
-  );
+  const hasLiveGames = games.some(isGameInProgress);
 
   const fetchScores = useCallback(async (showLoading = false, forceRefresh = false) => {
     if (showLoading) setLoading(true);

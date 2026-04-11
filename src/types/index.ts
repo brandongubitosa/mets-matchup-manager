@@ -314,6 +314,8 @@ export type GameStatus = 'Preview' | 'Pre-Game' | 'Warmup' | 'In Progress' | 'Fi
 export interface LiveGame {
   gamePk: number;
   gameDate: string;
+  /** MLB `codedGameState` (e.g. I = in progress, F = final, P = preview). */
+  codedGameState?: string;
   status: {
     abstractGameState: string;
     detailedState: GameStatus | string;
