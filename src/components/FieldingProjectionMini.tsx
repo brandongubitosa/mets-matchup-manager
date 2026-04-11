@@ -12,6 +12,7 @@ import Svg, {
   G,
 } from 'react-native-svg';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../constants';
+import { useResponsiveLayout } from '../hooks';
 import { FieldSlotPlayer } from '../utils/fieldPositions';
 
 const SQRT2 = Math.SQRT2;
@@ -71,8 +72,9 @@ const SLOT_COORDS: { key: string; x: number; y: number }[] = [
   { key: 'DH', x: 12, y: 76 },
 ];
 
-const LABEL_W = 52;
-const LABEL_H = 26;
+/** Wider chips + larger type so names stay legible on phones. */
+const LABEL_W = 72;
+const LABEL_H = 36;
 
 const VB_W = VB;
 const VB_H = VB;
@@ -110,6 +112,7 @@ interface FieldHalfProps {
   abbr: string;
   fieldMap: Map<string, FieldSlotPlayer>;
   onPlayerPress?: (playerId: number) => void;
+  stackVertically: boolean;
 }
 
 /**
@@ -229,8 +232,8 @@ const BaseballFieldSvg: React.FC = () => {
   );
 };
 
-const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress }) => (
-  <View style={styles.half}>
+const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress, stackVertically }) => (
+  <View style={[styles.half, stackVertically && styles.halfStacked]}>
     <Text style={styles.teamAbbr}>{abbr}</Text>
     {/* Outer shell: overflow visible so labels are not clipped; inner clips only the SVG */}
     <View style={styles.fieldShell}>
@@ -259,7 +262,7 @@ const FieldHalf: React.FC<FieldHalfProps> = ({ abbr, fieldMap, onPlayerPress }) 
               accessibilityLabel={p ? `${key} ${p.lastName}` : `${key} empty`}
             >
               <Text style={styles.slotKey}>{key}</Text>
-              <Text style={styles.slotName} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={styles.slotName} numberOfLines={2} ellipsizeMode="tail">
                 {p?.lastName ?? '—'}
               </Text>
             </TouchableOpacity>
@@ -288,36 +291,52 @@ export const FieldingProjectionMini: React.FC<FieldingProjectionMiniProps> = ({
   onPlayerPress,
   opponentTeamId,
   opponentTeamName,
-}) => (
-  <View style={styles.row}>
-    <FieldHalf
-      abbr={myAbbr}
-      fieldMap={myFieldMap}
-      onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
-    />
-    <View style={styles.centerRule} />
-    <FieldHalf
-      abbr={oppAbbr}
-      fieldMap={oppFieldMap}
-      onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
-    />
-  </View>
-);
+}) => {
+  const { isCompact } = useResponsiveLayout();
+  const stackVertically = isCompact;
+
+  return (
+    <View style={[styles.row, stackVertically && styles.rowStacked]}>
+      <FieldHalf
+        abbr={myAbbr}
+        fieldMap={myFieldMap}
+        stackVertically={stackVertically}
+        onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
+      />
+      <View style={[styles.centerRule, stackVertically && styles.centerRuleStacked]} />
+      <FieldHalf
+        abbr={oppAbbr}
+        fieldMap={oppFieldMap}
+        stackVertically={stackVertically}
+        onPlayerPress={onPlayerPress ? (id) => onPlayerPress(id, opponentTeamId, opponentTeamName) : undefined}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
   },
+  rowStacked: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
   half: {
     flex: 1,
   },
+  halfStacked: {
+    flex: 0,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
   teamAbbr: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '800',
-    color: COLORS.textMuted,
+    color: COLORS.textPrimary,
     textAlign: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
     letterSpacing: 0.5,
   },
   fieldShell: {
@@ -358,10 +377,10 @@ const styles = StyleSheet.create({
     maxWidth: LABEL_W,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
-    paddingHorizontal: 2,
-    backgroundColor: 'rgba(15, 35, 20, 0.82)',
-    borderRadius: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(15, 35, 20, 0.88)',
+    borderRadius: 6,
     borderWidth: Platform.OS === 'web' ? 0 : StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.2)',
     ...Platform.select({
@@ -378,22 +397,30 @@ const styles = StyleSheet.create({
     }),
   },
   slotKey: {
-    fontSize: 8,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '800',
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.9)',
     letterSpacing: 0.4,
   },
   slotName: {
-    fontSize: 8,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
-    maxWidth: LABEL_W - 4,
+    maxWidth: LABEL_W - 8,
+    lineHeight: FONT_SIZE.sm + 3,
   },
   centerRule: {
     width: 1,
     alignSelf: 'stretch',
     backgroundColor: COLORS.borderLight,
     marginHorizontal: SPACING.xs,
+  },
+  centerRuleStacked: {
+    width: '100%',
+    height: 1,
+    alignSelf: 'stretch',
+    marginVertical: SPACING.md,
+    marginHorizontal: 0,
   },
 });
