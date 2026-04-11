@@ -62,8 +62,7 @@ const lerpPt = (
 
 /**
  * SS: on the 3B-2B diagonal (~40% from 3B), nudged toward 3B and slightly shallow OF.
- * 2B: on the 2B-1B line (~18% toward 1B from second), nudged shallow OF so he sits
- * to the first-base side of the keystone (standard vs SS on this diagram).
+ * 2B: on the 2B-1B line, farther toward 1B (right) and deeper in (toward home / mound).
  */
 const SS_CHIP = (() => {
   const raw = lerpPt(B3, B2, 0.4);
@@ -71,8 +70,8 @@ const SS_CHIP = (() => {
 })();
 
 const TWO_B_CHIP = (() => {
-  const raw = lerpPt(B2, B1, 0.18);
-  return { x: raw.x, y: raw.y - 2.5 };
+  const raw = lerpPt(B2, B1, 0.32);
+  return { x: raw.x + 1.2, y: raw.y + 0.45 };
 })();
 
 /**
