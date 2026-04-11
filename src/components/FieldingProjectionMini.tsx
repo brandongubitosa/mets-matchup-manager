@@ -53,11 +53,27 @@ const FENCE_L = { x: HOME.x - fenceK, y: HOME.y - fenceK };
 const FENCE_R = { x: HOME.x + fenceK, y: HOME.y - fenceK };
 const FENCE_C = { x: 50, y: 26 };
 
+const lerp = (a: number, b: number, t: number): number => a + t * (b - a);
+const lerpPt = (
+  p: { x: number; y: number },
+  q: { x: number; y: number },
+  t: number
+): { x: number; y: number } => ({ x: lerp(p.x, q.x, t), y: lerp(p.y, q.y, t) });
+
 /**
- * Second baseman — up the middle, shaded toward 1B at normal depth (infield dirt),
- * not shallow CF. Prior chip was too far up (toward OF) and read “wrong” vs SS.
+ * SS: on the 3B-2B diagonal (~40% from 3B), nudged toward 3B and slightly shallow OF.
+ * 2B: on the 2B-1B line (~18% toward 1B from second), nudged shallow OF so he sits
+ * to the first-base side of the keystone (standard vs SS on this diagram).
  */
-const B2_CHIP = { x: B2.x + 6, y: B2.y + 5 };
+const SS_CHIP = (() => {
+  const raw = lerpPt(B3, B2, 0.4);
+  return { x: raw.x - 1, y: raw.y - 3 };
+})();
+
+const TWO_B_CHIP = (() => {
+  const raw = lerpPt(B2, B1, 0.18);
+  return { x: raw.x, y: raw.y - 2.5 };
+})();
 
 /**
  * Player chips (% = viewBox), aligned to square-diamond geometry.
@@ -67,8 +83,8 @@ const SLOT_COORDS: { key: string; x: number; y: number }[] = [
   { key: 'CF', x: FENCE_C.x, y: FENCE_C.y + 2 },
   { key: 'RF', x: FENCE_R.x - 11, y: FENCE_R.y - 15 },
   { key: '3B', x: B3.x, y: B3.y - 3 },
-  { key: 'SS', x: (B3.x + B2.x) / 2 - 2, y: (B3.y + B2.y) / 2 - 4 },
-  { key: '2B', x: B2_CHIP.x, y: B2_CHIP.y },
+  { key: 'SS', x: SS_CHIP.x, y: SS_CHIP.y },
+  { key: '2B', x: TWO_B_CHIP.x, y: TWO_B_CHIP.y },
   { key: '1B', x: B1.x + 4, y: B1.y - 8 },
   { key: 'P', x: MOUND.x, y: MOUND.y - 2 },
   { key: 'C', x: HOME.x, y: HOME.y - 7 },
@@ -331,7 +347,7 @@ export const FieldingProjectionMini: React.FC<FieldingProjectionMiniProps> = ({
    */
   const rowW = containerW > 0 ? containerW : winW * 0.88;
   const stackedDiagramSide = stackVertically
-    ? Math.min(rowW * 0.98, winH * 0.24, 260)
+    ? Math.min(rowW * 0.98, winH * 0.29, 288)
     : undefined;
 
   return (
