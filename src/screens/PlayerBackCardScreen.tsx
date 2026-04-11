@@ -203,10 +203,6 @@ export const PlayerBackCardScreen: React.FC<Props> = ({ navigation, route }) => 
 
               {hitting && <HittingTable stats={hitting} />}
               {pitching && <PitchingTable stats={pitching} />}
-
-              <Text style={styles.footerFine}>
-                Season stats from MLB Stats API · Not affiliated with Topps
-              </Text>
             </View>
 
             <View style={[styles.photoPanel, splitRow && styles.photoPanelSplit]}>
@@ -465,12 +461,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
     fontWeight: '600',
-  },
-  footerFine: {
-    marginTop: SPACING.md,
-    fontSize: 9,
-    color: COLORS.textMuted,
-    fontStyle: 'italic',
   },
   photoPanel: {
     minHeight: 220,
