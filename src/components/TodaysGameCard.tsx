@@ -65,13 +65,16 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
 }) => {
   const { game, opposingPitcher, loading, error, refetch } = useTodaysGame(teamId);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [lineupRefreshCounter, setLineupRefreshCounter] = React.useState(0);
   const handleRefresh = React.useCallback(async () => {
     setRefreshing(true);
     await refetch(true);
+    setLineupRefreshCounter((c) => c + 1);
     setRefreshing(false);
   }, [refetch]);
   const { homeLineup, awayLineup, loading: lineupLoading } = useGameLineup(
-    compact ? game?.gameId : undefined
+    compact ? game?.gameId : undefined,
+    lineupRefreshCounter
   );
 
   // Determine which lineup side belongs to my team vs opponent
@@ -317,7 +320,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
             <View style={styles.lineupLoading}>
               <ActivityIndicator size="small" color={COLORS.textMuted} />
             </View>
-          ) : (myLineup.length === 0 && oppLineup.length === 0) ? (
+          ) : (myLineup.length === 0 || oppLineup.length === 0) ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
               refreshControl={

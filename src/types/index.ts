@@ -262,6 +262,23 @@ export interface GamePredictionResult {
   parkFactor: number;
 }
 
+export interface PredictionRecord {
+  gameId: number;
+  date: string;                           // 'YYYY-MM-DD' local date
+  homeTeamId: number;
+  homeTeamName: string;
+  awayTeamId: number;
+  awayTeamName: string;
+  predictedWinner: 'home' | 'away';
+  homeWinProbability: number;
+  confidence: number;
+  actualWinner: 'home' | 'away' | null;  // null until game is final
+  actualHomeScore: number | null;
+  actualAwayScore: number | null;
+  isCorrect: boolean | null;             // null until result is known
+  savedAt: string;                       // ISO timestamp
+}
+
 export interface BatterSplitEntry {
   code: string;         // 'h' | 'a' | 'vl' | 'vr'
   description: string;  // 'Home Games' | 'Away Games' | 'vs Left' | 'vs Right'

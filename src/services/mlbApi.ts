@@ -2455,3 +2455,29 @@ export const predictGame = async (params: {
     return { success: false, error: formatError(error) };
   }
 };
+
+export interface GameResult {
+  homeScore: number;
+  awayScore: number;
+  isFinal: boolean;
+}
+
+export const getGameResult = async (gameId: number): Promise<GameResult | null> => {
+  try {
+    const response = await api.get('/schedule', {
+      params: { gamePks: gameId, hydrate: 'linescore' },
+    });
+    const game = response.data?.dates?.[0]?.games?.[0];
+    if (!game) return null;
+    const isFinal =
+      game.status?.abstractGameState === 'Final' ||
+      game.status?.codedGameState === 'F';
+    return {
+      homeScore: game.teams?.home?.score ?? game.linescore?.teams?.home?.runs ?? 0,
+      awayScore: game.teams?.away?.score ?? game.linescore?.teams?.away?.runs ?? 0,
+      isFinal,
+    };
+  } catch {
+    return null;
+  }
+};

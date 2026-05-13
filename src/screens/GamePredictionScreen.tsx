@@ -20,6 +20,8 @@ import {
   TeamBullpenStatus,
 } from '../types';
 import { predictGame, getTeamBullpenFatigue, getGameWeather, GameWeather, getUmpireStats, UmpireStats } from '../services/mlbApi';
+import { savePredictionRecord } from '../services/storage';
+import { formatLocalDateYMD } from '../services/mlbApi';
 
 type Props = {
   navigation: GamePredictionScreenNavigationProp;
@@ -380,6 +382,27 @@ export const GamePredictionScreen: React.FC<Props> = ({ navigation, route }) => 
   const [umpire, setUmpire] = useState<UmpireStats | null>(null);
   const [umpireLoading, setUmpireLoading] = useState(true);
   const [umpireNoData, setUmpireNoData] = useState(false);
+
+  // Auto-save a prediction record the first time a pre-game result is computed.
+  useEffect(() => {
+    if (!prediction || !gameId || prediction.isLive) return;
+    savePredictionRecord({
+      gameId,
+      date: formatLocalDateYMD(new Date()),
+      homeTeamId,
+      homeTeamName,
+      awayTeamId,
+      awayTeamName,
+      predictedWinner: prediction.predictedWinner,
+      homeWinProbability: prediction.homeWinProbability,
+      confidence: prediction.confidence,
+      actualWinner: null,
+      actualHomeScore: null,
+      actualAwayScore: null,
+      isCorrect: null,
+      savedAt: new Date().toISOString(),
+    });
+  }, [prediction, gameId, homeTeamId, homeTeamName, awayTeamId, awayTeamName]);
 
   useEffect(() => {
     let cancelled = false;

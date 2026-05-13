@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PredictionRecord } from '../types';
 
 const STORAGE_KEYS = {
   SELECTED_TEAM: '@mets_matchup:selected_team',
+  PREDICTION_RECORDS: '@mets_matchup:prediction_records',
 } as const;
 
 export interface SelectedTeam {
@@ -36,5 +38,54 @@ export const clearSelectedTeam = async (): Promise<void> => {
     await AsyncStorage.removeItem(STORAGE_KEYS.SELECTED_TEAM);
   } catch (error) {
     console.error('Error clearing selected team:', error);
+  }
+};
+
+export const getPredictionRecords = async (): Promise<PredictionRecord[]> => {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.PREDICTION_RECORDS);
+    if (!value) return [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as PredictionRecord[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Saves a prediction record. Skips silently if a record for this gameId already exists. */
+export const savePredictionRecord = async (record: PredictionRecord): Promise<void> => {
+  try {
+    const existing = await getPredictionRecords();
+    if (existing.some((r) => r.gameId === record.gameId)) return;
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.PREDICTION_RECORDS,
+      JSON.stringify([record, ...existing])
+    );
+  } catch (error) {
+    console.error('Error saving prediction record:', error);
+  }
+};
+
+/** Merges a partial update into an existing record matched by gameId. */
+export const updatePredictionRecord = async (
+  gameId: number,
+  update: Partial<PredictionRecord>
+): Promise<void> => {
+  try {
+    const existing = await getPredictionRecords();
+    const updated = existing.map((r) =>
+      r.gameId === gameId ? { ...r, ...update } : r
+    );
+    await AsyncStorage.setItem(STORAGE_KEYS.PREDICTION_RECORDS, JSON.stringify(updated));
+  } catch (error) {
+    console.error('Error updating prediction record:', error);
+  }
+};
+
+export const clearPredictionRecords = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.PREDICTION_RECORDS);
+  } catch (error) {
+    console.error('Error clearing prediction records:', error);
   }
 };
