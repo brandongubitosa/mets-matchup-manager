@@ -10,6 +10,7 @@ import {
   MatchupDetailScreen,
   GamePredictionScreen,
   PlayerBackCardScreen,
+  PredictionHistoryScreen,
 } from './src/screens';
 import { ErrorBoundary, WebContainer } from './src/components';
 import { WebDocumentHead } from './src/components/WebDocumentHead';
@@ -74,6 +75,11 @@ export default function App() {
               name="PlayerBackCard"
               component={PlayerBackCardScreen}
               options={{ title: 'Player Card', headerShown: false }}
+            />
+            <Stack.Screen
+              name="PredictionHistory"
+              component={PredictionHistoryScreen}
+              options={{ title: 'Prediction Record', headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>

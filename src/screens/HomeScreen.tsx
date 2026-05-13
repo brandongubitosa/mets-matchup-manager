@@ -17,7 +17,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, MLB_TEAMS } from '../constants';
 import { HomeScreenNavigationProp, TodaysGame, Player } from '../types';
-import { usePersistedTeam, useResponsiveLayout } from '../hooks';
+import { usePersistedTeam, useResponsiveLayout, usePredictionHistory } from '../hooks';
 import { getLiveScores } from '../services/mlbApi';
 import { isGameInProgress } from '../utils/liveGame';
 import { TodaysGameCard, TeamLogo, AnimatedCard } from '../components';
@@ -36,6 +36,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const isFocused = useIsFocused();
   const { team: selectedTeam, setTeam: setSelectedTeam, isLoading } = usePersistedTeam();
   const { isTablet } = useResponsiveLayout();
+  const { stats: predStats } = usePredictionHistory();
   const [hasLiveGames, setHasLiveGames] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [teamSearch, setTeamSearch] = useState('');
@@ -165,6 +166,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             }
           />
         </AnimatedCard>
+
+        {/* My Prediction Record strip */}
+        <TouchableOpacity
+          style={styles.recordStrip}
+          onPress={() => navigation.navigate('PredictionHistory')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="View prediction record"
+        >
+          <Text style={styles.recordStripIcon}>🏆</Text>
+          {predStats.total === 0 ? (
+            <Text style={styles.recordStripText}>My Prediction Record</Text>
+          ) : (
+            <>
+              <Text style={styles.recordStripRecord}>
+                {predStats.correct}–{predStats.incorrect}
+              </Text>
+              <Text style={styles.recordStripDot}>·</Text>
+              <Text style={styles.recordStripText}>
+                {Math.round(predStats.accuracy * 100)}% accuracy
+                {predStats.pending > 0 ? `  (${predStats.pending} pending)` : ''}
+              </Text>
+            </>
+          )}
+          <Text style={styles.recordStripArrow}>›</Text>
+        </TouchableOpacity>
 
         {/* Quick-action row: Live Scores · Batters · Pitchers */}
         <View style={styles.quickRow}>
@@ -398,6 +425,43 @@ const styles = StyleSheet.create({
   },
   gameCardWrapper: {
     flex: 1,
+  },
+
+  // ── Prediction Record Strip ───────────────────────────────────────────
+  recordStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  recordStripIcon: {
+    fontSize: 14,
+  },
+  recordStripRecord: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  recordStripDot: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    fontWeight: '400',
+  },
+  recordStripText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
+  recordStripArrow: {
+    fontSize: FONT_SIZE.lg,
+    color: COLORS.textMuted,
+    fontWeight: '700',
   },
 
   // ── Quick-Action Row (3 boxes) ────────────────────────────────────────
