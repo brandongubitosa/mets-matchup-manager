@@ -12,11 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
-import { PredictionHistoryScreenNavigationProp } from '../types';
-import { usePredictionHistory } from '../hooks';
+import { PredictionHistoryScreenNavigationProp, PredictionHistoryScreenRouteProp } from '../types';
+import { usePredictionHistory, useTodaysGame } from '../hooks';
 import { TeamLogo } from '../components';
+import { predictGame, formatLocalDateYMD } from '../services/mlbApi';
 
-type Props = { navigation: PredictionHistoryScreenNavigationProp };
+type Props = {
+  navigation: PredictionHistoryScreenNavigationProp;
+  route: PredictionHistoryScreenRouteProp;
+};
 
 const formatDate = (dateStr: string): string => {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -36,9 +40,59 @@ const ConfidenceLabel: React.FC<{ confidence: number }> = ({ confidence }) => {
   );
 };
 
-export const PredictionHistoryScreen: React.FC<Props> = ({ navigation }) => {
-  const { records, stats, loading, refreshResults, clearAll } = usePredictionHistory();
+export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { teamId } = route.params;
+  const { records, stats, loading, addRecord, refreshResults, clearAll } = usePredictionHistory();
+  const { game, opposingPitcher } = useTodaysGame(teamId);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [seeding, setSeeding] = React.useState(false);
+
+  // On first open, auto-run today's pre-game prediction if no record exists for it yet.
+  useEffect(() => {
+    if (loading || !game?.gameId || game.status !== 'Preview') return;
+    if (records.some((r) => r.gameId === game.gameId)) return;
+
+    const homeTeamId = game.isHome ? teamId : game.opponent.id;
+    const homeTeamName = game.isHome ? MLB_TEAMS[teamId]?.name ?? '' : game.opponent.name;
+    const awayTeamId = game.isHome ? game.opponent.id : teamId;
+    const awayTeamName = game.isHome ? game.opponent.name : MLB_TEAMS[teamId]?.name ?? '';
+
+    const seed = async () => {
+      setSeeding(true);
+      const result = await predictGame({
+        homeTeamId,
+        homeTeamName,
+        awayTeamId,
+        awayTeamName,
+        homePitcherId: game.isHome ? game.myProbablePitcher?.id : opposingPitcher?.id,
+        awayPitcherId: game.isHome ? opposingPitcher?.id : game.myProbablePitcher?.id,
+        gameId: game.gameId,
+      });
+      if (result.success && !result.data.isLive) {
+        await addRecord({
+          gameId: game.gameId,
+          date: formatLocalDateYMD(new Date()),
+          homeTeamId,
+          homeTeamName,
+          awayTeamId,
+          awayTeamName,
+          predictedWinner: result.data.predictedWinner,
+          homeWinProbability: result.data.homeWinProbability,
+          confidence: result.data.confidence,
+          actualWinner: null,
+          actualHomeScore: null,
+          actualAwayScore: null,
+          isCorrect: null,
+          savedAt: new Date().toISOString(),
+        });
+      }
+      setSeeding(false);
+    };
+
+    seed();
+  // Only run when records finish loading and game data is available
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, game?.gameId, game?.status]);
 
   useEffect(() => {
     refreshResults();
@@ -111,15 +165,20 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       )}
 
-      {loading ? (
+      {loading || seeding ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={COLORS.primary} />
+          {seeding && (
+            <Text style={styles.seedingText}>Running today's prediction…</Text>
+          )}
         </View>
       ) : records.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>No predictions yet</Text>
           <Text style={styles.emptyText}>
-            Open a game prediction to start tracking your record.
+            {game?.status === 'Live' || game?.status === 'Final'
+              ? "Today's game is already underway. Open the prediction screen before first pitch to start tracking."
+              : 'Open a game prediction before first pitch to start tracking your record.'}
           </Text>
         </View>
       ) : (
@@ -295,6 +354,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  seedingText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
   },
   list: {
     padding: SPACING.md,

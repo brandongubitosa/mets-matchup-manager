@@ -170,7 +170,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* My Prediction Record strip */}
         <TouchableOpacity
           style={styles.recordStrip}
-          onPress={() => navigation.navigate('PredictionHistory')}
+          onPress={() => navigation.navigate('PredictionHistory', { teamId: selectedTeam.id })}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="View prediction record"
