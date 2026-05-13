@@ -191,11 +191,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>No predictions yet</Text>
           <Text style={styles.emptyText}>
-            {game?.status === 'Final'
-              ? "Today's game is already over. Check back before first pitch tomorrow to start tracking."
-              : ['Postponed', 'Delayed', 'Cancelled'].includes(game?.status ?? '')
-              ? "Today's game is not available for predictions. Check back when the next game is scheduled."
-              : 'Open this screen any time before or during a game and your prediction will be saved automatically.'}
+            Open this screen any time before or during a game and your prediction will be saved automatically.
           </Text>
         </View>
       ) : (
