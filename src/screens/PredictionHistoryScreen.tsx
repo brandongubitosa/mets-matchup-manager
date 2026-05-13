@@ -76,7 +76,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
       if (result.success) {
         // For live games use the pre-game probability so we track the pre-game forecast,
         // not the live-adjusted win probability which is influenced by the current score.
-        const preGameProb = result.data.isLive && result.data.liveGameState
+        const preGameProb = (result.data.isLive && result.data.liveGameState?.preGameProbability != null)
           ? result.data.liveGameState.preGameProbability
           : result.data.homeWinProbability;
         const predictedWinner: 'home' | 'away' = preGameProb >= 0.5 ? 'home' : 'away';
@@ -193,6 +193,8 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
           <Text style={styles.emptyText}>
             {game?.status === 'Final'
               ? "Today's game is already over. Check back before first pitch tomorrow to start tracking."
+              : ['Postponed', 'Delayed', 'Cancelled'].includes(game?.status ?? '')
+              ? "Today's game is not available for predictions. Check back when the next game is scheduled."
               : 'Open this screen any time before or during a game and your prediction will be saved automatically.'}
           </Text>
         </View>
