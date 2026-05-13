@@ -50,9 +50,9 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
   // On first open, auto-run today's pre-game prediction if no record exists for it yet.
   useEffect(() => {
     let cancelled = false;
-    // Seed for pre-game (Preview) and in-progress (Live) games.
-    // Skip Final/Postponed/Delayed/Cancelled — too late to record a meaningful prediction.
-    const seedableStatuses = ['Preview', 'Live'];
+    // Seed for pre-game (Preview), in-progress (Live), and completed (Final) games.
+    // Skip Postponed/Delayed/Cancelled — games that didn't happen or are uncertain.
+    const seedableStatuses = ['Preview', 'Live', 'Final'];
     console.log('[PredictionHistory] Seed check:', { loading, gameId: game?.gameId, status: game?.status, hasPreviousRecord: records.some((r) => r.gameId === game?.gameId) });
     if (loading || !game?.gameId || !seedableStatuses.includes(game.status)) return;
     if (records.some((r) => r.gameId === game.gameId)) return;
