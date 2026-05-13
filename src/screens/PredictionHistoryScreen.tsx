@@ -49,6 +49,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
 
   // On first open, auto-run today's pre-game prediction if no record exists for it yet.
   useEffect(() => {
+    let cancelled = false;
     if (loading || !game?.gameId || game.status !== 'Preview') return;
     if (records.some((r) => r.gameId === game.gameId)) return;
 
@@ -68,6 +69,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         awayPitcherId: game.isHome ? opposingPitcher?.id : game.myProbablePitcher?.id,
         gameId: game.gameId,
       });
+      if (cancelled) return;
       if (result.success && !result.data.isLive) {
         await addRecord({
           gameId: game.gameId,
@@ -86,10 +88,12 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
           savedAt: new Date().toISOString(),
         });
       }
+      if (cancelled) return;
       setSeeding(false);
     };
 
     seed();
+    return () => { cancelled = true; };
   // Only run when records finish loading and game data is available
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, game?.gameId, game?.status]);
