@@ -8,7 +8,7 @@ interface UseGameLineupReturn {
   loading: boolean;
 }
 
-export const useGameLineup = (gameId: number | undefined): UseGameLineupReturn => {
+export const useGameLineup = (gameId: number | undefined, refreshCounter = 0): UseGameLineupReturn => {
   const [homeLineup, setHomeLineup] = useState<LineupPlayer[]>([]);
   const [awayLineup, setAwayLineup] = useState<LineupPlayer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export const useGameLineup = (gameId: number | undefined): UseGameLineupReturn =
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
+  }, [gameId, refreshCounter]);
 
   return { homeLineup, awayLineup, loading };
 };
