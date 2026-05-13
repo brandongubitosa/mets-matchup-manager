@@ -50,7 +50,10 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
   // On first open, auto-run today's pre-game prediction if no record exists for it yet.
   useEffect(() => {
     let cancelled = false;
-    if (loading || !game?.gameId || game.status !== 'Preview') return;
+    // Seed for pre-game (Preview) and in-progress (Live) games.
+    // Skip Final/Postponed/Delayed/Cancelled — too late to record a meaningful prediction.
+    const seedableStatuses = ['Preview', 'Live'];
+    if (loading || !game?.gameId || !seedableStatuses.includes(game.status)) return;
     if (records.some((r) => r.gameId === game.gameId)) return;
 
     const homeTeamId = game.isHome ? teamId : game.opponent.id;
@@ -70,7 +73,15 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         gameId: game.gameId,
       });
       if (cancelled) return;
-      if (result.success && !result.data.isLive) {
+      if (result.success) {
+        // For live games use the pre-game probability so we track the pre-game forecast,
+        // not the live-adjusted win probability which is influenced by the current score.
+        const preGameProb = result.data.isLive && result.data.liveGameState
+          ? result.data.liveGameState.preGameProbability
+          : result.data.homeWinProbability;
+        const predictedWinner: 'home' | 'away' = preGameProb >= 0.5 ? 'home' : 'away';
+        const confidence = Math.abs(preGameProb - 0.5) * 2;
+
         await addRecord({
           gameId: game.gameId,
           date: formatLocalDateYMD(new Date()),
@@ -78,9 +89,9 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
           homeTeamName,
           awayTeamId,
           awayTeamName,
-          predictedWinner: result.data.predictedWinner,
-          homeWinProbability: result.data.homeWinProbability,
-          confidence: result.data.confidence,
+          predictedWinner,
+          homeWinProbability: preGameProb,
+          confidence,
           actualWinner: null,
           actualHomeScore: null,
           actualAwayScore: null,
@@ -180,9 +191,9 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>No predictions yet</Text>
           <Text style={styles.emptyText}>
-            {game?.status === 'Live' || game?.status === 'Final'
-              ? "Today's game is already underway. Open the prediction screen before first pitch to start tracking."
-              : 'Open a game prediction before first pitch to start tracking your record.'}
+            {game?.status === 'Final'
+              ? "Today's game is already over. Check back before first pitch tomorrow to start tracking."
+              : 'Open this screen any time before or during a game and your prediction will be saved automatically.'}
           </Text>
         </View>
       ) : (
