@@ -53,6 +53,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
     // Seed for pre-game (Preview) and in-progress (Live) games.
     // Skip Final/Postponed/Delayed/Cancelled — too late to record a meaningful prediction.
     const seedableStatuses = ['Preview', 'Live'];
+    console.log('[PredictionHistory] Seed check:', { loading, gameId: game?.gameId, status: game?.status, hasPreviousRecord: records.some((r) => r.gameId === game?.gameId) });
     if (loading || !game?.gameId || !seedableStatuses.includes(game.status)) return;
     if (records.some((r) => r.gameId === game.gameId)) return;
 
@@ -62,6 +63,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
     const awayTeamName = game.isHome ? game.opponent.name : MLB_TEAMS[teamId]?.name ?? '';
 
     const seed = async () => {
+      console.log('[PredictionHistory] Starting seed...');
       setSeeding(true);
       const result = await predictGame({
         homeTeamId,
@@ -72,6 +74,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         awayPitcherId: game.isHome ? opposingPitcher?.id : game.myProbablePitcher?.id,
         gameId: game.gameId,
       });
+      console.log('[PredictionHistory] Prediction result:', { success: result.success, error: !result.success ? result.error : undefined });
       if (cancelled) return;
       if (result.success) {
         // For live games use the pre-game probability so we track the pre-game forecast,
@@ -82,6 +85,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
         const predictedWinner: 'home' | 'away' = preGameProb >= 0.5 ? 'home' : 'away';
         const confidence = Math.abs(preGameProb - 0.5) * 2;
 
+        console.log('[PredictionHistory] Adding record...');
         await addRecord({
           gameId: game.gameId,
           date: formatLocalDateYMD(new Date()),
@@ -98,6 +102,7 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation, route }) 
           isCorrect: null,
           savedAt: new Date().toISOString(),
         });
+        console.log('[PredictionHistory] Record added successfully');
       }
       if (cancelled) return;
       setSeeding(false);
