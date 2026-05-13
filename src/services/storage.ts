@@ -44,7 +44,9 @@ export const clearSelectedTeam = async (): Promise<void> => {
 export const getPredictionRecords = async (): Promise<PredictionRecord[]> => {
   try {
     const value = await AsyncStorage.getItem(STORAGE_KEYS.PREDICTION_RECORDS);
-    return value ? (JSON.parse(value) as PredictionRecord[]) : [];
+    if (!value) return [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as PredictionRecord[]) : [];
   } catch {
     return [];
   }

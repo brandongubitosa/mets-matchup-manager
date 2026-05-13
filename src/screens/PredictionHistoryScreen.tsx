@@ -47,8 +47,11 @@ export const PredictionHistoryScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshResults();
-    setRefreshing(false);
+    try {
+      await refreshResults();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleClearAll = () => {

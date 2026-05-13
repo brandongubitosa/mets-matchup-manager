@@ -2473,8 +2473,8 @@ export const getGameResult = async (gameId: number): Promise<GameResult | null> 
       game.status?.abstractGameState === 'Final' ||
       game.status?.codedGameState === 'F';
     return {
-      homeScore: game.teams?.home?.score ?? 0,
-      awayScore: game.teams?.away?.score ?? 0,
+      homeScore: game.teams?.home?.score ?? game.linescore?.teams?.home?.runs ?? 0,
+      awayScore: game.teams?.away?.score ?? game.linescore?.teams?.away?.runs ?? 0,
       isFinal,
     };
   } catch {
