@@ -1,14 +1,12 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW, MLB_TEAMS } from '../constants';
 import { NO_GAME_SCHEDULED_TODAY } from '../services/mlbApi';
-import { useTodaysGame, useTeamRoster, useGameLineup } from '../hooks';
+import { useTodaysGame, useGameLineup } from '../hooks';
 import { TodaysGame, Player, LineupPlayer } from '../types';
 import { TeamLogo } from './TeamLogo';
 import { SkeletonGameCard } from './SkeletonLoader';
-import { FieldingProjectionMini } from './FieldingProjectionMini';
-import { buildFieldMapFromLineup, buildFieldMapFromRoster } from '../utils/fieldPositions';
 
 interface TodaysGameCardProps {
   teamId: number;
@@ -72,10 +70,6 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
     await refetch(true);
     setRefreshing(false);
   }, [refetch]);
-  const { batters: myBatters, loading: myRosterLoading } = useTeamRoster(compact ? teamId : 0);
-  const { batters: oppBatters, loading: oppRosterLoading } = useTeamRoster(
-    compact ? (game?.opponent?.id ?? 0) : 0
-  );
   const { homeLineup, awayLineup, loading: lineupLoading } = useGameLineup(
     compact ? game?.gameId : undefined
   );
@@ -84,17 +78,7 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
   const myLineup: LineupPlayer[] = game?.isHome ? homeLineup : awayLineup;
   const oppLineup: LineupPlayer[] = game?.isHome ? awayLineup : homeLineup;
 
-  const myFieldMap = useMemo(() => {
-    if (myLineup.length > 0) return buildFieldMapFromLineup(myLineup);
-    return buildFieldMapFromRoster(myBatters);
-  }, [myLineup, myBatters]);
-
-  const oppFieldMap = useMemo(() => {
-    if (oppLineup.length > 0) return buildFieldMapFromLineup(oppLineup);
-    return buildFieldMapFromRoster(oppBatters);
-  }, [oppLineup, oppBatters]);
-
-  const displayLineupLoading = compact && (myRosterLoading || oppRosterLoading || lineupLoading);
+  const displayLineupLoading = compact && lineupLoading;
 
   if (loading) {
     return <SkeletonGameCard />;
@@ -313,40 +297,82 @@ export const TodaysGameCard: React.FC<TodaysGameCardProps> = ({
         )
       )}
 
-      {/* Fielding projection — compact: by defensive position (not batting order) */}
+      {/* Batting lineups — side-by-side in compact mode */}
       {compact && (
         <View style={styles.lineupSection}>
-          <Text style={styles.fieldSectionTitle}>Fielding projection</Text>
-          <Text style={styles.fieldSectionHint}>
-            Players on the field by position. Batting order updates when lineups are official.
-          </Text>
-          {!displayLineupLoading && (myLineup.length === 0 || oppLineup.length === 0) && (
-            <View style={styles.projectedBanner}>
-              <Text style={styles.projectedBannerText}>PROJECTED POSITIONS</Text>
+          {/* Column headers */}
+          <View style={styles.lineupHeaderRow}>
+            <View style={styles.lineupHeaderCol}>
+              <TeamLogo teamId={teamId} size={16} />
+              <Text style={styles.lineupHeaderAbbr}>{MLB_TEAMS[teamId]?.abbreviation ?? '???'}</Text>
             </View>
-          )}
+            <View style={styles.lineupHeaderDivider} />
+            <View style={[styles.lineupHeaderCol, styles.lineupHeaderColRight]}>
+              <Text style={styles.lineupHeaderAbbr}>{opponentAbbr}</Text>
+              <TeamLogo teamId={game.opponent.id} size={16} />
+            </View>
+          </View>
 
           {displayLineupLoading ? (
             <View style={styles.lineupLoading}>
               <ActivityIndicator size="small" color={COLORS.textMuted} />
             </View>
-          ) : (
+          ) : (myLineup.length === 0 && oppLineup.length === 0) ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.fieldScrollContent}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
               }
             >
-              <FieldingProjectionMini
-                myAbbr={MLB_TEAMS[teamId]?.abbreviation ?? '—'}
-                oppAbbr={opponentAbbr}
-                myFieldMap={myFieldMap}
-                oppFieldMap={oppFieldMap}
-                onPlayerPress={onPlayerPress}
-                opponentTeamId={game.opponent.id}
-                opponentTeamName={game.opponent.name}
-              />
+              <View style={styles.lineupTbd}>
+                <Text style={styles.lineupTbdText}>Official lineups not yet posted</Text>
+              </View>
+            </ScrollView>
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.lineupScrollContent}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
+              }
+            >
+              {Array.from({ length: Math.max(myLineup.length, oppLineup.length, 9) }, (_, i) => {
+                const mine = myLineup[i];
+                const opp = oppLineup[i];
+                return (
+                  <View key={i} style={styles.lineupPairRow}>
+                    {/* My team batter */}
+                    <TouchableOpacity
+                      style={styles.lineupBatterLeft}
+                      onPress={() => mine && onPlayerPress?.(mine.playerId, game.opponent.id, game.opponent.name)}
+                      disabled={!mine || !onPlayerPress}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.lineupBatOrder}>{i + 1}</Text>
+                      <Text style={[styles.lineupBatName, mine && onPlayerPress && styles.lineupBatNameTappable]} numberOfLines={1}>
+                        {mine ? mine.fullName.split(' ').slice(-1)[0] : '—'}
+                      </Text>
+                      <Text style={styles.lineupBatPos}>{mine?.position ?? ''}</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.lineupPairDivider} />
+
+                    {/* Opponent batter */}
+                    <TouchableOpacity
+                      style={styles.lineupBatterRight}
+                      onPress={() => opp && onPlayerPress?.(opp.playerId, game.opponent.id, game.opponent.name)}
+                      disabled={!opp || !onPlayerPress}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.lineupBatPos}>{opp?.position ?? ''}</Text>
+                      <Text style={[styles.lineupBatName, opp && onPlayerPress && styles.lineupBatNameTappable]} numberOfLines={1}>
+                        {opp ? opp.fullName.split(' ').slice(-1)[0] : '—'}
+                      </Text>
+                      <Text style={styles.lineupBatOrder}>{i + 1}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </ScrollView>
           )}
         </View>
@@ -560,30 +586,34 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  fieldSectionTitle: {
-    fontSize: FONT_SIZE.sm,
+  lineupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+    backgroundColor: COLORS.background,
+  },
+  lineupHeaderCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  lineupHeaderColRight: {
+    justifyContent: 'flex-end',
+  },
+  lineupHeaderAbbr: {
+    fontSize: FONT_SIZE.xs,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
+    letterSpacing: 0.5,
   },
-  fieldSectionHint: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xs,
-    lineHeight: 18,
-  },
-  projectedBanner: {
-    backgroundColor: `${COLORS.secondary}18`,
-    paddingVertical: 3,
-    alignItems: 'center',
-  },
-  projectedBannerText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.secondary,
-    letterSpacing: 1,
+  lineupHeaderDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: COLORS.borderLight,
   },
   lineupLoading: {
     flex: 1,
@@ -591,9 +621,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.lg,
   },
-  fieldScrollContent: {
-    paddingHorizontal: SPACING.xs,
+  lineupScrollContent: {
     paddingBottom: SPACING.sm,
+  },
+  lineupTbd: {
+    paddingVertical: SPACING.lg,
+    alignItems: 'center',
+  },
+  lineupTbdText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  lineupPairRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  lineupBatterLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs + 1,
+    gap: SPACING.xs,
+  },
+  lineupBatterRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs + 1,
+    gap: SPACING.xs,
+  },
+  lineupPairDivider: {
+    width: 1,
+    backgroundColor: COLORS.borderLight,
+    marginVertical: 2,
+  },
+  lineupBatOrder: {
+    width: 14,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+  lineupBatName: {
+    flex: 1,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  lineupBatNameTappable: {
+    color: COLORS.primary,
+  },
+  lineupBatPos: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+    width: 22,
+    textAlign: 'center',
   },
   pitcherLabel: {
     fontSize: FONT_SIZE.sm,
