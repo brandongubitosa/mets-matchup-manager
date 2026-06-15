@@ -344,6 +344,316 @@ describe('mlbApi', () => {
         expect(result.data.stats.plateAppearances).toBe(12);
       }
     });
+
+    it('aggregates multiple splits correctly, summing PA and AB across splits', async () => {
+      // Two seasonal splits — combineVsPlayerTotalSplits must add them together
+      mockGet
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [
+                {
+                  stat: {
+                    gamesPlayed: 5,
+                    plateAppearances: 15,
+                    atBats: 13,
+                    hits: 4,
+                    doubles: 1,
+                    triples: 0,
+                    homeRuns: 1,
+                    rbi: 2,
+                    baseOnBalls: 2,
+                    strikeOuts: 3,
+                    hitByPitch: 0,
+                    sacFlies: 0,
+                  },
+                },
+                {
+                  stat: {
+                    gamesPlayed: 5,
+                    plateAppearances: 13,
+                    atBats: 12,
+                    hits: 3,
+                    doubles: 0,
+                    triples: 0,
+                    homeRuns: 0,
+                    rbi: 1,
+                    baseOnBalls: 1,
+                    strikeOuts: 2,
+                    hitByPitch: 0,
+                    sacFlies: 0,
+                  },
+                },
+              ],
+            }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 10, fullName: 'Multi Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 20, fullName: 'Multi Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 120, atBats: 450, hits: 130 } }] }] },
+        });
+
+      const result = await getBatterVsPitcher(10, 20);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Totals: atBats = 13+12 = 25, PA = 15+13 = 28, hits = 4+3 = 7
+        expect(result.data.stats.atBats).toBe(25);
+        expect(result.data.stats.plateAppearances).toBe(28);
+        expect(result.data.stats.hits).toBe(7);
+        // gamesPlayed = 5+5 = 10
+        expect(result.data.stats.gamesPlayed).toBe(10);
+        // AVG = 7/25 = .280
+        expect(result.data.stats.avg).toBe('.280');
+      }
+    });
+
+    it('omits plateAppearances from stats when not provided by API splits', async () => {
+      // API split has no plateAppearances field
+      mockGet
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [{
+                stat: {
+                  gamesPlayed: 8,
+                  atBats: 20,
+                  hits: 6,
+                  doubles: 1,
+                  triples: 0,
+                  homeRuns: 0,
+                  rbi: 2,
+                  baseOnBalls: 2,
+                  strikeOuts: 4,
+                  // no plateAppearances field
+                },
+              }],
+            }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 11, fullName: 'Batter No PA', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 22, fullName: 'Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 60, atBats: 220, hits: 60 } }] }] },
+        });
+
+      const result = await getBatterVsPitcher(11, 22);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.stats.atBats).toBe(20);
+        // plateAppearances should not appear when API did not provide it (PA sums to 0)
+        expect(result.data.stats.plateAppearances).toBeUndefined();
+      }
+    });
+
+    it('returns emptyStats when all splits have zero atBats and zero plateAppearances', async () => {
+      // Splits exist but all counts are zero → combineVsPlayerTotalSplits returns null
+      mockGet
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [{
+                stat: {
+                  gamesPlayed: 0,
+                  plateAppearances: 0,
+                  atBats: 0,
+                  hits: 0,
+                },
+              }],
+            }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 30, fullName: 'Zero Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 40, fullName: 'Zero Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 80, atBats: 300, hits: 90 } }] }] },
+        });
+
+      const result = await getBatterVsPitcher(30, 40);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.stats.atBats).toBe(0);
+        expect(result.data.stats.avg).toBe('.000');
+        expect(result.data.stats.ops).toBe('.000');
+        expect(result.data.stats.plateAppearances).toBeUndefined();
+      }
+    });
+
+    it('uses the vsPlayerTotal endpoint (not vsPlayer)', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: { stats: [] } })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 50, fullName: 'B', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 60, fullName: 'P', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({ data: { stats: [] } });
+
+      await getBatterVsPitcher(50, 60);
+
+      // First call must use vsPlayerTotal, not the old vsPlayer
+      const firstCallArg: string = mockGet.mock.calls[0][0];
+      expect(firstCallArg).toContain('vsPlayerTotal');
+      expect(firstCallArg).not.toContain('stats=vsPlayer&');
+    });
+
+    it('skips splits whose stat object is missing', async () => {
+      // One valid split, one with no stat — the valid split should still be used
+      mockGet
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [
+                { /* no stat key */ },
+                {
+                  stat: {
+                    gamesPlayed: 3,
+                    plateAppearances: 10,
+                    atBats: 9,
+                    hits: 3,
+                    doubles: 0,
+                    triples: 0,
+                    homeRuns: 1,
+                    rbi: 1,
+                    baseOnBalls: 1,
+                    strikeOuts: 2,
+                  },
+                },
+              ],
+            }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 70, fullName: 'Skip Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 80, fullName: 'Skip Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { stats: [{ splits: [{ stat: { gamesPlayed: 100, atBats: 400, hits: 120 } }] }] },
+        });
+
+      const result = await getBatterVsPitcher(70, 80);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Only the valid split counts
+        expect(result.data.stats.atBats).toBe(9);
+        expect(result.data.stats.plateAppearances).toBe(10);
+        expect(result.data.stats.hits).toBe(3);
+      }
+    });
+
+    it('includes seasonStats in result when season response has data', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: { stats: [] } })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 90, fullName: 'Season Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 91, fullName: 'Season Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [{
+                stat: {
+                  gamesPlayed: 100,
+                  atBats: 380,
+                  hits: 110,
+                  doubles: 20,
+                  triples: 3,
+                  homeRuns: 18,
+                  rbi: 65,
+                  baseOnBalls: 40,
+                  strikeOuts: 80,
+                },
+              }],
+            }],
+          },
+        });
+
+      const result = await getBatterVsPitcher(90, 91);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.seasonStats).toBeDefined();
+        expect(result.data.seasonStats!.atBats).toBe(380);
+        expect(result.data.seasonStats!.hits).toBe(110);
+        // AVG = 110/380 ≈ .289
+        expect(result.data.seasonStats!.avg).toBe('.289');
+      }
+    });
+
+    it('does not include seasonStats when season response has no splits', async () => {
+      mockGet
+        .mockResolvedValueOnce({ data: { stats: [] } })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 92, fullName: 'No Season Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 93, fullName: 'No Season Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({ data: { stats: [] } });
+
+      const result = await getBatterVsPitcher(92, 93);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.seasonStats).toBeUndefined();
+      }
+    });
+
+    it('plateAppearances is excluded when it is explicitly zero across all splits', async () => {
+      // plateAppearances: 0 in the stat → treated same as absent → not in final stats
+      mockGet
+        .mockResolvedValueOnce({
+          data: {
+            stats: [{
+              splits: [{
+                stat: {
+                  gamesPlayed: 4,
+                  plateAppearances: 0,
+                  atBats: 0,
+                  hits: 0,
+                },
+              }],
+            }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 94, fullName: 'Zero PA Batter', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({
+          data: { people: [{ id: 95, fullName: 'Zero PA Pitcher', primaryPosition: {} }] },
+        })
+        .mockResolvedValueOnce({ data: { stats: [] } });
+
+      const result = await getBatterVsPitcher(94, 95);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Both PA and AB are 0 → combineVsPlayerTotalSplits returns null → emptyStats used
+        expect(result.data.stats.atBats).toBe(0);
+        expect(result.data.stats.plateAppearances).toBeUndefined();
+      }
+    });
   });
 
   describe('getTodaysGame', () => {
