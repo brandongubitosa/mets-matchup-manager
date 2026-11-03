@@ -469,13 +469,26 @@ describe('mlbApi', () => {
     it('reports unavailable stats when the function returns no rows', async () => {
       mockGet
         .mockResolvedValueOnce(schedule)
-        .mockResolvedValueOnce({ data: { error: 'STRING_API_KEY is not set' } });
+        .mockResolvedValueOnce({ data: { rows: [] } });
 
       const result = await getUmpireStats(1);
 
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error).toBe('Umpire stats unavailable');
+      }
+    });
+
+    it('reports a network error when the function fails', async () => {
+      const axiosError = new MockAxiosError('Request failed with status code 502');
+      axiosError.response = { status: 502 };
+      mockGet.mockResolvedValueOnce(schedule).mockRejectedValueOnce(axiosError);
+
+      const result = await getUmpireStats(1);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('Network error: Request failed with status code 502');
       }
     });
   });
