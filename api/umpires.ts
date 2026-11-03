@@ -51,9 +51,16 @@ export async function GET(): Promise<Response> {
       return json({ error: `umpscorecards returned ${envelope.statusCode}` }, 502, 'no-store');
     }
 
-    // Only the fields the app reads; drop rows without a name, since the app lowercases it
+    // Only the fields the app reads; drop rows the app can't use, since it lowercases the
+    // name and calls toFixed() on the stats
     const rows: UmpireRow[] = data.rows
-      .filter((r: Partial<UmpireRow> | null) => typeof r?.umpire === 'string')
+      .filter(
+        (r: Partial<UmpireRow> | null) =>
+          typeof r?.umpire === 'string' &&
+          [r.n, r.overall_accuracy_wmean, r.consistency_wmean, r.total_run_impact_mean].every(
+            Number.isFinite
+          )
+      )
       .map((r: UmpireRow) => ({
         umpire: r.umpire,
         n: r.n,
