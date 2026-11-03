@@ -33,6 +33,12 @@ import { withCacheAndDedupe, invalidateCacheKey } from './apiCache';
 const BASE_URL = 'https://statsapi.mlb.com/api/v1';
 const API_TIMEOUT_MS = 10000;
 
+/**
+ * Origin of this app's own Vercel functions (/api/*). Empty on web, where they share the
+ * page's origin; native builds must set EXPO_PUBLIC_API_BASE_URL to the deployed site.
+ */
+const SERVER_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: API_TIMEOUT_MS,
@@ -1174,10 +1180,9 @@ export const getUmpireStats = async (gameId: number): Promise<ApiResult<UmpireSt
     }
     const umpireName = hpUmpire.official.fullName;
 
-    // Step 2: Fetch career stats from umpscorecards
-    const umpRes = await axios.create({ timeout: 8000 }).get(
-      'https://umpscorecards.com/api/umpires/',
-      { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } }
+    // Step 2: Fetch career stats from umpscorecards, via our /api/umpires function (String)
+    const umpRes = await axios.create({ timeout: 25000 }).get(
+      `${SERVER_API_BASE_URL}/api/umpires`
     );
     const rows: Array<{
       umpire: string;
