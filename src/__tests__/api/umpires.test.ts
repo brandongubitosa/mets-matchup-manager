@@ -53,6 +53,18 @@ describe('api/umpires', () => {
     expect((await res.json()).rows[0].umpire).toBe('Pat Hoberg');
   });
 
+  it('drops rows without an umpire name', async () => {
+    mockFetch.mockResolvedValueOnce(
+      stringReply({ statusCode: 200, data: { rows: [{ n: 3 }, null, row] } })
+    );
+
+    const res = await GET();
+
+    const { rows } = await res.json();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].umpire).toBe('Pat Hoberg');
+  });
+
   it('does not cache a failed String request', async () => {
     mockFetch.mockResolvedValueOnce(stringReply({ error: 'Invalid API key' }, 401));
 

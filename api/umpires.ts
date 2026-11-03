@@ -51,14 +51,16 @@ export async function GET(): Promise<Response> {
       return json({ error: `umpscorecards returned ${envelope.statusCode}` }, 502, 'no-store');
     }
 
-    // Only the fields the app reads
-    const rows: UmpireRow[] = data.rows.map((r: UmpireRow) => ({
-      umpire: r.umpire,
-      n: r.n,
-      overall_accuracy_wmean: r.overall_accuracy_wmean,
-      consistency_wmean: r.consistency_wmean,
-      total_run_impact_mean: r.total_run_impact_mean,
-    }));
+    // Only the fields the app reads; drop rows without a name, since the app lowercases it
+    const rows: UmpireRow[] = data.rows
+      .filter((r: Partial<UmpireRow> | null) => typeof r?.umpire === 'string')
+      .map((r: UmpireRow) => ({
+        umpire: r.umpire,
+        n: r.n,
+        overall_accuracy_wmean: r.overall_accuracy_wmean,
+        consistency_wmean: r.consistency_wmean,
+        total_run_impact_mean: r.total_run_impact_mean,
+      }));
 
     return json(
       { rows },
