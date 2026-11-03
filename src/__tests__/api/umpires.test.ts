@@ -54,14 +54,16 @@ describe('api/umpires', () => {
   });
 
   it('drops rows without an umpire name or numeric stats', async () => {
-    const rows = [
+    const upstreamRows = [
       { n: 3 },
       null,
       { ...row, umpire: 'No Accuracy', overall_accuracy_wmean: undefined },
       { ...row, umpire: 'Text Consistency', consistency_wmean: '96.0' },
       row,
     ];
-    mockFetch.mockResolvedValueOnce(stringReply({ statusCode: 200, data: { rows } }));
+    mockFetch.mockResolvedValueOnce(
+      stringReply({ statusCode: 200, data: { rows: upstreamRows } })
+    );
 
     const res = await GET();
 
