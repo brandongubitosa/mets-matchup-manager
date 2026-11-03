@@ -74,6 +74,19 @@ describe('api/umpires', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
+  it.each([
+    ['umpscorecards returns an error', { statusCode: 500, data: { rows: [row] } }],
+    ['rows are missing', { statusCode: 200, data: {} }],
+    ['rows are not a list', { statusCode: 200, data: { rows: 'oops' } }],
+  ])('does not cache a reply where %s', async (_, envelope) => {
+    mockFetch.mockResolvedValueOnce(stringReply(envelope));
+
+    const res = await GET();
+
+    expect(res.status).toBe(502);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
   it('fails without calling String when the key is missing', async () => {
     delete process.env.STRING_API_KEY;
 
