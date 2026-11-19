@@ -2,7 +2,7 @@
 
 import projectionJson from '../data/projectionData.json';
 import type { ProjectionData, ProjectionPlayer } from '../types/projection';
-import { leagueContextFor, marginalWins, type RosterMoves } from '../projection';
+import { leagueContextFor, marginalWins, type FixedWarPlayer, type RosterMoves } from '../projection';
 import { cachedHitter, cachedPitcher } from '../projection/team';
 import { playerRoles } from '../projection/players';
 import { getFreeAgents, type FreeAgent } from './projectionData';
@@ -160,7 +160,11 @@ const withWinsAdded = (teamId: number, moves: RosterMoves, list: Candidate[]): C
 
 /** Applies a candidate to a set of moves. */
 export const acquire = (moves: RosterMoves, c: Candidate): RosterMoves => {
-  if (c.fixedWar) return { ...moves, addFixedWar: [...(moves.addFixedWar ?? []), c.fixedWar] };
+  if (c.fixedWar) {
+    const existing = moves.addFixedWar ?? [];
+    if (existing.some((f) => f.id === c.fixedWar!.id)) return moves;
+    return { ...moves, addFixedWar: [...existing, c.fixedWar] };
+  }
   if (c.mlbId == null) return moves;
   return {
     ...moves,
@@ -187,6 +191,29 @@ export const removeFixedWar = (moves: RosterMoves, id: string): RosterMoves => (
   ...moves,
   addFixedWar: (moves.addFixedWar ?? []).filter((f) => f.id !== id),
 });
+
+/** Validates moves read from storage; anything malformed is dropped rather than crashing the screen. */
+export const sanitizeMoves = (raw: unknown): RosterMoves => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const r = raw as Record<string, unknown>;
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x)) : []);
+  const fixed = Array.isArray(r.addFixedWar)
+    ? r.addFixedWar.filter(
+        (f): f is FixedWarPlayer =>
+          !!f &&
+          typeof f === 'object' &&
+          typeof (f as FixedWarPlayer).name === 'string' &&
+          typeof (f as FixedWarPlayer).war === 'number' &&
+          Number.isFinite((f as FixedWarPlayer).war) &&
+          typeof (f as FixedWarPlayer).isPitcher === 'boolean',
+      )
+    : [];
+  const out: RosterMoves = {};
+  if (ids(r.add).length) out.add = ids(r.add);
+  if (ids(r.remove).length) out.remove = ids(r.remove);
+  if (fixed.length) out.addFixedWar = fixed;
+  return out;
+};
 
 /** Human-readable list of moves for the summary chips. */
 export const describeMoves = (moves: RosterMoves) => [

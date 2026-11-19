@@ -94,8 +94,29 @@ export const buildLineup = (hitters: HitterProjection[], lg: LeagueContext): Hit
   const slots: HitterSlot[] = [];
   let missedPa = 0;
 
-  for (const slot of LINEUP_SLOTS) {
-    const pick = pool.find((h) => !used.has(h.playerId) && h.eligible.includes(slot.pos));
+  // Pick starters best-first, keeping each hitter only if every starter can still be given an
+  // eligible position (augmenting path). Unlike filling slots one at a time, this never strands a
+  // position because a multi-position player took a spot someone else needed.
+  const assigned = new Map<number, HitterProjection>(); // slot index -> hitter
+  const place = (h: HitterProjection, seen: Set<number>): boolean => {
+    for (let i = 0; i < LINEUP_SLOTS.length; i++) {
+      if (seen.has(i) || !h.eligible.includes(LINEUP_SLOTS[i].pos)) continue;
+      seen.add(i);
+      const current = assigned.get(i);
+      if (!current || place(current, seen)) {
+        assigned.set(i, h);
+        return true;
+      }
+    }
+    return false;
+  };
+  for (const h of pool) {
+    if (assigned.size === LINEUP_SLOTS.length) break;
+    place(h, new Set());
+  }
+
+  for (const [i, slot] of LINEUP_SLOTS.entries()) {
+    const pick = assigned.get(i);
     if (!pick) {
       missedPa += slot.pa;
       continue;

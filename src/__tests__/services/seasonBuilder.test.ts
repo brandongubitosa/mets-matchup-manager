@@ -6,6 +6,7 @@ import {
   removeFixedWar,
   removePlayer,
   restorePlayer,
+  sanitizeMoves,
   seasonData,
   tradeCandidates,
 } from '../../services/seasonBuilder';
@@ -74,5 +75,31 @@ describe('roster moves', () => {
     });
     expect(describeMoves(moves)).toEqual([{ kind: 'addFixed', id: 'x', name: 'NPB Star' }]);
     expect(removeFixedWar(moves, 'x').addFixedWar).toEqual([]);
+  });
+
+  it('does not duplicate a fixed-WAR signing', () => {
+    const c = {
+      key: 'fa-x', source: 'freeAgent' as const, mlbId: null, name: 'NPB Star', position: 'SP', age: 28, from: 'NPB',
+      war: 2, winsAdded: 2, fixedWar: { id: 'x', name: 'NPB Star', war: 2, isPitcher: true },
+    };
+    expect(acquire(acquire({}, c), c).addFixedWar).toHaveLength(1);
+  });
+});
+
+describe('sanitizeMoves', () => {
+  it('returns empty moves for malformed storage values', () => {
+    expect(sanitizeMoves(null)).toEqual({});
+    expect(sanitizeMoves('oops')).toEqual({});
+    expect(sanitizeMoves([1, 2])).toEqual({});
+  });
+
+  it('keeps valid moves and drops invalid entries', () => {
+    expect(
+      sanitizeMoves({
+        add: [1, 'x', 2.5, 3],
+        remove: 'nope',
+        addFixedWar: [{ id: 'a', name: 'A', war: 1.5, isPitcher: false }, { name: 'B' }, null],
+      }),
+    ).toEqual({ add: [1, 3], addFixedWar: [{ id: 'a', name: 'A', war: 1.5, isPitcher: false }] });
   });
 });

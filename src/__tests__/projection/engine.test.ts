@@ -148,6 +148,30 @@ describe('team projection', () => {
     expect(starters.length).toBeGreaterThanOrEqual(8);
   });
 
+  it('fills every slot when a multi-position star competes with a one-position player', () => {
+    const h = (id: number, runsPerPa: number, eligible: string[]) =>
+      ({ playerId: id, name: `P${id}`, age: 28, bats: 'R', position: eligible[0], eligible, rates: {} as never,
+        runsPerPa, marcelPa: 600, availability: 1, warPer600: 0 }) as ReturnType<typeof projectHitter>;
+    // U is the best hitter and can play SS or 2B; S can only play SS. Greedy slot-filling would put
+    // U at SS and leave 2B empty.
+    const hitters = [
+      h(1, 0.05, ['SS', '2B', 'DH']), // U
+      h(2, 0.02, ['SS', 'DH']), // S
+      h(3, 0.0, ['C', 'DH']),
+      h(4, 0.0, ['CF', 'LF', 'RF', 'DH']),
+      h(5, 0.0, ['3B', '1B', 'DH']),
+      h(6, 0.0, ['RF', 'LF', 'DH']),
+      h(7, 0.0, ['LF', 'RF', 'DH']),
+      h(8, 0.0, ['1B', 'DH']),
+      h(9, -0.01, ['DH']),
+    ];
+    const starters = buildLineup(hitters, lg).filter((s) => s.starter);
+    expect(starters).toHaveLength(9);
+    const posOf = (id: number) => starters.find((s) => s.hitter.playerId === id)?.pos;
+    expect(posOf(1)).toBe('2B');
+    expect(posOf(2)).toBe('SS');
+  });
+
   it('projects a full staff and plausible totals for the Mets', () => {
     const t = projectTeam({ teamId: METS, players: data.rosters[METS].map((id) => data.players[id]) }, lg);
     expect(t.rotation.length).toBeGreaterThanOrEqual(5);

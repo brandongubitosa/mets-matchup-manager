@@ -116,11 +116,30 @@ export const fetchSnapshot = async (season: number, opts: SnapshotOptions = {}):
   });
 
   const scheduleRes = await get(`/schedule?sportId=1&season=${season}&gameType=R`);
-  const schedule: ScheduledGame[] = scheduleRes.dates.flatMap((d: any) =>
-    d.games
-      .filter((g: any) => g.resumedFrom == null) // suspended games appear twice
-      .map((g: any) => ({ gamePk: g.gamePk, date: d.date, home: g.teams.home.team.id, away: g.teams.away.team.id })),
-  );
+  // A postponed game is listed on its original date (status Postponed) and again on its makeup date
+  // under the same gamePk; suspended games are listed again with resumedFrom set. Keep one entry per
+  // gamePk, preferring a played or still-scheduled entry. Games that are only Postponed or Cancelled
+  // (never made up, or postponed with no new date yet) are dropped since they will not be played.
+  const NOT_PLAYED = new Set(['Postponed', 'Cancelled']);
+  const byPk = new Map<number, ScheduledGame & { playable: boolean }>();
+  for (const d of scheduleRes.dates) {
+    for (const g of d.games) {
+      if (g.resumedFrom != null) continue;
+      const entry = {
+        gamePk: g.gamePk,
+        date: d.date,
+        home: g.teams.home.team.id,
+        away: g.teams.away.team.id,
+        playable: !NOT_PLAYED.has(g.status?.detailedState),
+      };
+      const existing = byPk.get(g.gamePk);
+      if (!existing || (!existing.playable && entry.playable)) byPk.set(g.gamePk, entry);
+    }
+  }
+  const schedule: ScheduledGame[] = [...byPk.values()]
+    .filter((g) => g.playable)
+    .map(({ playable: _playable, ...g }) => g)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.gamePk - b.gamePk);
 
   let freeAgentIds: Record<string, number> = {};
   if (opts.freeAgents?.length) {

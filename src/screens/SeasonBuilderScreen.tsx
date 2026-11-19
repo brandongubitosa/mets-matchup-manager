@@ -160,7 +160,7 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
                 setQuery('');
               }}
               style={[styles.tab, tab === t.key && styles.tabActive]}
-              accessibilityRole="tab"
+              accessibilityRole="button"
               accessibilityState={{ selected: tab === t.key }}
             >
               <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
@@ -185,6 +185,8 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
                 key={f}
                 onPress={() => setFaFilter(f)}
                 style={[styles.filter, faFilter === f && styles.filterActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: faFilter === f }}
               >
                 <Text style={[styles.filterText, faFilter === f && styles.filterTextActive]}>
                   {f === 'all' ? 'All' : f === 'bat' ? 'Hitters' : 'Pitchers'}
@@ -201,7 +203,13 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
                 Minor leaguers not on the 40-man. Wins added is how much they'd help today's depth chart.
               </Text>
             )}
-            {candidates.length === 0 && <Text style={styles.note}>No players found.</Text>}
+            {candidates.length === 0 && (
+              <Text style={styles.note}>
+                {tab === 'callup' && !seasonData.callUps[teamId]
+                  ? `Call-up candidates are currently available for the Mets only. Use the Trade tab to add any 40-man player.`
+                  : 'No players found.'}
+              </Text>
+            )}
             {candidates.map((c) => (
               <CandidateRow key={c.key} c={c} onAdd={() => b.setMoves((cur) => acquire(cur, c))} />
             ))}
@@ -314,7 +322,12 @@ const DepthChart: React.FC<{ team: TeamProjection; onRemove: (playerId: number) 
             <Text style={styles.rowSub}>{r.detail}</Text>
           </View>
           <Text style={styles.rowWins}>{r.war.toFixed(1)}</Text>
-          <TouchableOpacity onPress={() => onRemove(r.id)} style={styles.removeBtn} accessibilityLabel={`Remove ${r.name}`}>
+          <TouchableOpacity
+            onPress={() => onRemove(r.id)}
+            style={styles.removeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${r.name}`}
+          >
             <Text style={styles.removeBtnText}>Remove</Text>
           </TouchableOpacity>
         </View>

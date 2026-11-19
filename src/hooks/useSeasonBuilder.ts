@@ -9,15 +9,19 @@ import {
   type RosterMoves,
   type SeasonSimResult,
 } from '../projection';
-import { seasonData } from '../services/seasonBuilder';
+import { sanitizeMoves, seasonData } from '../services/seasonBuilder';
 
 const SIMS = 1000;
+const EMPTY_MOVES: RosterMoves = {};
 const storageKey = (teamId: number) => `seasonBuilder:${seasonData.season}:${teamId}`;
 
 /** Roster moves for one team, persisted per device, with live projections and a background simulation. */
 export const useSeasonBuilder = (teamId: number) => {
-  const [moves, setMovesState] = useState<RosterMoves>({});
-  const [loaded, setLoaded] = useState(false);
+  // Moves are tagged with the team they were loaded for, so switching teams never shows or saves
+  // the previous team's moves while the new team's are loading.
+  const [store, setStore] = useState<{ teamId: number | null; moves: RosterMoves }>({ teamId: null, moves: {} });
+  const loaded = store.teamId === teamId;
+  const moves = loaded ? store.moves : EMPTY_MOVES;
   const [sim, setSim] = useState<SeasonSimResult | null>(null);
   const [simulating, setSimulating] = useState(false);
   const simRun = useRef(0);
@@ -25,11 +29,11 @@ export const useSeasonBuilder = (teamId: number) => {
   useEffect(() => {
     let cancelled = false;
     AsyncStorage.getItem(storageKey(teamId))
-      .then((raw) => {
-        if (!cancelled && raw) setMovesState(JSON.parse(raw));
-      })
-      .catch(() => undefined)
-      .finally(() => !cancelled && setLoaded(true));
+      .then((raw) => (raw ? sanitizeMoves(JSON.parse(raw)) : {}))
+      .catch(() => ({}))
+      .then((loadedMoves) => {
+        if (!cancelled) setStore({ teamId, moves: loadedMoves });
+      });
     return () => {
       cancelled = true;
     };
@@ -37,10 +41,11 @@ export const useSeasonBuilder = (teamId: number) => {
 
   const setMoves = useCallback(
     (next: RosterMoves | ((m: RosterMoves) => RosterMoves)) => {
-      setMovesState((prev) => {
-        const value = typeof next === 'function' ? next(prev) : next;
+      setStore((prev) => {
+        if (prev.teamId !== teamId) return prev; // still loading this team's moves
+        const value = typeof next === 'function' ? next(prev.moves) : next;
         AsyncStorage.setItem(storageKey(teamId), JSON.stringify(value)).catch(() => undefined);
-        return value;
+        return { teamId, moves: value };
       });
     },
     [teamId],
