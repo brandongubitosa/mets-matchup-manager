@@ -193,6 +193,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <Text style={styles.recordStripArrow}>›</Text>
         </TouchableOpacity>
 
+        {/* Season Builder strip */}
+        <TouchableOpacity
+          style={styles.recordStrip}
+          onPress={() => navigation.navigate('SeasonBuilder', { teamId: selectedTeam.id })}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Open season builder"
+        >
+          <Text style={styles.recordStripIcon}>📈</Text>
+          <Text style={styles.recordStripText}>Season Builder · project next year's record</Text>
+          <Text style={styles.recordStripArrow}>›</Text>
+        </TouchableOpacity>
+
         {/* Quick-action row: Live Scores · Batters · Pitchers */}
         <View style={styles.quickRow}>
           {/* Live Scores */}

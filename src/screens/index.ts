@@ -6,3 +6,4 @@ export { MatchupDetailScreen } from './MatchupDetailScreen';
 export { GamePredictionScreen } from './GamePredictionScreen';
 export { PlayerBackCardScreen } from './PlayerBackCardScreen';
 export { PredictionHistoryScreen } from './PredictionHistoryScreen';
+export { SeasonBuilderScreen } from './SeasonBuilderScreen';

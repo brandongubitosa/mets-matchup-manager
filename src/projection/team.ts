@@ -39,6 +39,8 @@ export interface PitcherSlot {
 
 /** A player added by WAR alone (e.g. an NPB signing with no MLB stats). */
 export interface FixedWarPlayer {
+  /** Stable key, e.g. the FanGraphs id, so the move can be undone. */
+  id?: string;
   name: string;
   war: number;
   isPitcher: boolean;
@@ -61,6 +63,22 @@ export interface TeamProjection {
   /** Share of PA taken by left-handed hitters (switch hitters count half), for platoon effects. */
   lineupLeftShare: number;
 }
+
+// Player projections depend only on the player and league context, so cache them across roster edits.
+const hitterCache = new WeakMap<LeagueContext, WeakMap<ProjectionPlayer, HitterProjection>>();
+const pitcherCache = new WeakMap<LeagueContext, WeakMap<ProjectionPlayer, PitcherProjection>>();
+
+const memo = <T>(cache: WeakMap<LeagueContext, WeakMap<ProjectionPlayer, T>>, fn: (p: ProjectionPlayer, lg: LeagueContext) => T) =>
+  (p: ProjectionPlayer, lg: LeagueContext): T => {
+    let byPlayer = cache.get(lg);
+    if (!byPlayer) cache.set(lg, (byPlayer = new WeakMap()));
+    let v = byPlayer.get(p);
+    if (v === undefined) byPlayer.set(p, (v = fn(p, lg)));
+    return v;
+  };
+
+export const cachedHitter = memo(hitterCache, projectHitter);
+export const cachedPitcher = memo(pitcherCache, projectPitcher);
 
 const sumBy = <T>(arr: T[], f: (x: T) => number) => arr.reduce((s, x) => s + f(x), 0);
 
@@ -134,8 +152,8 @@ export const projectTeam = (input: TeamInput, lg: LeagueContext): TeamProjection
   const pitchers: PitcherProjection[] = [];
   for (const p of input.players) {
     const roles = playerRoles(p);
-    if (roles.hitter) hitters.push(projectHitter(p, lg));
-    if (roles.pitcher) pitchers.push(projectPitcher(p, lg));
+    if (roles.hitter) hitters.push(cachedHitter(p, lg));
+    if (roles.pitcher) pitchers.push(cachedPitcher(p, lg));
   }
 
   const lineup = buildLineup(hitters, lg);

@@ -5,3 +5,4 @@ export { useTeamRoster } from './useTeamRoster';
 export { useGameLineup } from './useGameLineup';
 export { useResponsiveLayout } from './useResponsiveLayout';
 export { usePredictionHistory } from './usePredictionHistory';
+export { useSeasonBuilder } from './useSeasonBuilder';

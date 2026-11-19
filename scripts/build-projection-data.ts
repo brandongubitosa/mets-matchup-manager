@@ -79,6 +79,31 @@ await mapLimit(teams, 5, async (team) => {
   console.log(`  ${team.abbr}: ${rosters[team.id].length} players`);
 });
 
+// Call-up candidates: Mets upper-minors players (AAA, AA, High-A) who are not on the 40-man.
+const CALLUP_ORGS = [121];
+const callUps: Record<string, number[]> = {};
+await mapLimit(CALLUP_ORGS, 1, async (orgId) => {
+  const aff = await get(`/teams/affiliates?teamIds=${orgId}&season=${rosterSeason}`);
+  const clubs = aff.teams.filter((t: any) => [11, 12, 13].includes(t.sport?.id)).map((t: any) => t.id);
+  const ids = new Set<number>();
+  for (const club of clubs) {
+    const r = await get(`/teams/${club}/roster?rosterType=active&season=${rosterSeason}`);
+    for (const e of r.roster ?? []) if (!players[e.person.id]) ids.add(e.person.id);
+  }
+  const list = [...ids];
+  await mapLimit(chunk(list, 50), 3, async (batch) => {
+    const q = `personIds=${batch.join(',')}`;
+    const [mlb, milb] = await Promise.all([
+      get(`/people?${q}&hydrate=${MLB_HYDRATE}`),
+      get(`/people?${q}&hydrate=${MILB_HYDRATE}`),
+    ]);
+    const milbById = new Map<number, any>(milb.people.map((p: any) => [p.id, p]));
+    for (const p of mlb.people) players[p.id] = buildPlayer(p, milbById.get(p.id), mlbSeasons, milbSeasons);
+  });
+  callUps[orgId] = list;
+  console.log(`  Call-up candidates for ${orgId}: ${list.length}`);
+});
+
 // League totals per season
 const league = await mapLimit(mlbSeasons, 3, async (s) => {
   const res = await get(`/teams/stats?season=${s}&group=hitting,pitching&stats=season&sportIds=1`);
@@ -130,6 +155,7 @@ const data: ProjectionData = {
   league,
   schedule,
   freeAgentIds,
+  callUps,
 };
 
 const outPath = join(root, 'src/data/projectionData.json');

@@ -2,8 +2,9 @@
 
 import type { ProjectionData } from '../types/projection';
 import type { FixedWarPlayer, TeamInput, TeamProjection } from './team.ts';
+import type { LeagueContext } from './players.ts';
 import { buildLeagueContext } from './players.ts';
-import { projectLeague } from './team.ts';
+import { projectLeague, projectTeam } from './team.ts';
 
 export interface RosterMoves {
   /** Players to add to the team (free agents, trade targets, call-ups). Removed from their old team. */
@@ -31,8 +32,36 @@ export const buildTeamInputs = (data: ProjectionData, moves: Record<number, Rost
   }));
 };
 
+// One league context per snapshot so cached player projections are reused across calls.
+const contexts = new WeakMap<ProjectionData, LeagueContext>();
+export const leagueContextFor = (data: ProjectionData): LeagueContext => {
+  let lg = contexts.get(data);
+  if (!lg) contexts.set(data, (lg = buildLeagueContext(data.league, data.season)));
+  return lg;
+};
+
 export const projectSeason = (data: ProjectionData, moves: Record<number, RosterMoves> = {}): TeamProjection[] =>
-  projectLeague(buildTeamInputs(data, moves), buildLeagueContext(data.league, data.season));
+  projectLeague(buildTeamInputs(data, moves), leagueContextFor(data));
+
+/**
+ * Wins a player would add to a team, projected in isolation (fast enough to rank a whole list).
+ * Accounts for who he displaces in the depth chart.
+ */
+export const marginalWins = (
+  data: ProjectionData,
+  teamId: number,
+  moves: RosterMoves,
+  playerId: number,
+): number => {
+  const lg = leagueContextFor(data);
+  const inputs = buildTeamInputs(data, { [teamId]: moves });
+  const team = inputs.find((t) => t.teamId === teamId)!;
+  const base = projectTeam(team, lg).wins;
+  if (team.players.some((p) => p.id === playerId)) return 0;
+  const player = data.players[playerId];
+  if (!player) return 0;
+  return projectTeam({ ...team, players: [...team.players, player] }, lg).wins - base;
+};
 
 export type { FixedWarPlayer, TeamProjection };
 
