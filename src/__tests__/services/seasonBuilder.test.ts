@@ -75,7 +75,7 @@ describe('roster moves', () => {
   it('handles fixed-WAR signings', () => {
     const moves = acquire({}, {
       key: 'fa-x', source: 'freeAgent', mlbId: null, name: 'NPB Star', position: 'SP', age: 28, from: 'NPB',
-      war: 2, winsAdded: 2, fixedWar: { id: 'x', name: 'NPB Star', war: 2, isPitcher: true },
+      war: 2, winsAdded: 2, cost: 0, fixedWar: { id: 'x', name: 'NPB Star', war: 2, isPitcher: true },
     });
     expect(describeMoves(moves)).toEqual([{ kind: 'addFixed', id: 'x', name: 'NPB Star' }]);
     expect(removeFixedWar(moves, 'x').addFixedWar).toEqual([]);
@@ -84,7 +84,7 @@ describe('roster moves', () => {
   it('does not duplicate a fixed-WAR signing', () => {
     const c = {
       key: 'fa-x', source: 'freeAgent' as const, mlbId: null, name: 'NPB Star', position: 'SP', age: 28, from: 'NPB',
-      war: 2, winsAdded: 2, fixedWar: { id: 'x', name: 'NPB Star', war: 2, isPitcher: true },
+      war: 2, winsAdded: 2, cost: 0, fixedWar: { id: 'x', name: 'NPB Star', war: 2, isPitcher: true },
     };
     expect(acquire(acquire({}, c), c).addFixedWar).toHaveLength(1);
   });

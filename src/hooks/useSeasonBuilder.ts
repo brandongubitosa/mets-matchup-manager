@@ -10,13 +10,15 @@ import {
   type SeasonSimResult,
 } from '../projection';
 import { sanitizeMoves, seasonData } from '../services/seasonBuilder';
+import { DEFAULT_CBT, teamPayroll, type CbtSettings } from '../services/payroll';
 
 const SIMS = 1000;
 const EMPTY_MOVES: RosterMoves = {};
 const storageKey = (teamId: number) => `seasonBuilder:${seasonData.season}:${teamId}`;
 
 /** Roster moves for one team, persisted per device, with live projections and a background simulation. */
-export const useSeasonBuilder = (teamId: number) => {
+export const useSeasonBuilder = (teamId: number, opts: { odds?: boolean } = {}) => {
+  const runOdds = opts.odds !== false;
   // Moves are tagged with the team they were loaded for, so switching teams never shows or saves
   // the previous team's moves while the new team's are loading.
   const [store, setStore] = useState<{ teamId: number | null; moves: RosterMoves }>({ teamId: null, moves: {} });
@@ -64,7 +66,7 @@ export const useSeasonBuilder = (teamId: number) => {
 
   // Simulate after the UI has updated; drop stale runs when moves change quickly.
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !runOdds) return;
     const run = ++simRun.current;
     setSimulating(true);
     const timer = setTimeout(() => {
@@ -75,7 +77,10 @@ export const useSeasonBuilder = (teamId: number) => {
       }
     }, 60);
     return () => clearTimeout(timer);
-  }, [projections, lg, loaded]);
+  }, [projections, lg, loaded, runOdds]);
+
+  const { settings: cbt, setSettings: setCbt } = useCbtSettings();
+  const payroll = useMemo(() => teamPayroll(teamId, moves, cbt), [teamId, moves, cbt]);
 
   return {
     loaded,
@@ -89,5 +94,36 @@ export const useSeasonBuilder = (teamId: number) => {
     teamSim: sim?.teams.find((t) => t.teamId === teamId) ?? null,
     simulating,
     outlook,
+    payroll,
+    cbt,
+    setCbt,
   };
+};
+
+const CBT_KEY = 'seasonBuilder:cbtSettings';
+
+/** Luxury tax settings (threshold and payer status), saved on the device. */
+export const useCbtSettings = () => {
+  const [settings, setState] = useState<CbtSettings>(DEFAULT_CBT);
+  useEffect(() => {
+    AsyncStorage.getItem(CBT_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const v = JSON.parse(raw);
+        if (
+          v &&
+          Number.isFinite(v.threshold) &&
+          v.threshold > 0 &&
+          ['first', 'second', 'repeat'].includes(v.payerStatus)
+        ) {
+          setState({ threshold: v.threshold, payerStatus: v.payerStatus });
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+  const setSettings = useCallback((next: CbtSettings) => {
+    setState(next);
+    AsyncStorage.setItem(CBT_KEY, JSON.stringify(next)).catch(() => undefined);
+  }, []);
+  return { settings, setSettings };
 };

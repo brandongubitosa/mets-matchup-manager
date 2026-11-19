@@ -7,3 +7,4 @@ export { GamePredictionScreen } from './GamePredictionScreen';
 export { PlayerBackCardScreen } from './PlayerBackCardScreen';
 export { PredictionHistoryScreen } from './PredictionHistoryScreen';
 export { SeasonBuilderScreen } from './SeasonBuilderScreen';
+export { SeasonSimScreen } from './SeasonSimScreen';

@@ -18,6 +18,7 @@ import {
   type Candidate,
 } from '../services/seasonBuilder';
 import type { TeamProjection } from '../projection';
+import { TIER_STEP, type CbtSettings, type PayerStatus, type TeamPayroll } from '../services/payroll';
 
 type Props = {
   navigation: SeasonBuilderScreenNavigationProp;
@@ -37,7 +38,10 @@ const TABS: { key: Tab; label: string }[] = [
 const abbr = (teamId: number) => seasonData.teams.find((t) => t.id === teamId)?.abbr ?? '';
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number, digits = 1) => `${x >= 0 ? '+' : ''}${x.toFixed(digits)}`;
-const money = (x?: number | null) => (x ? `$${(x / 1e6).toFixed(0)}M/yr` : '');
+const millions = (x: number) => `$${(x / 1e6).toFixed(Math.abs(x) < 10e6 ? 1 : 0)}M`;
+const money = (x?: number | null) => (x ? `${millions(x)}/yr` : '');
+const PAYER_LABELS: Record<PayerStatus, string> = { first: 'First-time payer', second: '2nd year over', repeat: '3+ years over' };
+const PAYER_ORDER: PayerStatus[] = ['first', 'second', 'repeat'];
 const record = (w: number) => `${Math.round(w)}–${162 - Math.round(w)}`;
 const monthName = (ym: string) =>
   new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1, 1).toLocaleDateString('en-US', { month: 'short' });
@@ -120,7 +124,17 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
             <Odds label="Playoffs" value={b.teamSim ? pct(b.teamSim.playoffPct) : '…'} />
           </View>
           {b.simulating && <Text style={styles.simulating}>Simulating {seasonData.season} season…</Text>}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SeasonSim', { teamId })}
+            style={styles.simBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Sim the ${seasonData.season} season`}
+          >
+            <Text style={styles.simBtnText}>▶ Sim {seasonData.season} Season</Text>
+          </TouchableOpacity>
         </View>
+
+        <PayrollCard payroll={b.payroll} cbt={b.cbt} setCbt={b.setCbt} />
 
         {/* Moves */}
         {moveList.length > 0 && (
@@ -279,6 +293,84 @@ const Odds: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   </View>
 );
 
+const PayrollCard: React.FC<{
+  payroll: TeamPayroll;
+  cbt: CbtSettings;
+  setCbt: (s: CbtSettings) => void;
+}> = ({ payroll, cbt, setCbt }) => {
+  const max = cbt.threshold + 4 * TIER_STEP;
+  const pct = (x: number) => `${Math.min(100, Math.max(0, (x / max) * 100))}%` as `${number}%`;
+  const tierColor = [COLORS.success, COLORS.warning, COLORS.warning, COLORS.danger, COLORS.danger][payroll.tier];
+  return (
+    <View style={[styles.card, SHADOW.sm]}>
+      <View style={styles.payHeader}>
+        <Text style={[styles.cardTitle, { flex: 1 }]}>{seasonData.season} Payroll</Text>
+        {payroll.delta !== 0 && (
+          <Text style={[styles.payDelta, { color: payroll.delta > 0 ? COLORS.danger : COLORS.success }]}>
+            {payroll.delta > 0 ? '+' : '-'}
+            {millions(Math.abs(payroll.delta))}
+          </Text>
+        )}
+      </View>
+      <View style={styles.payRow}>
+        <PayStat label="Payroll" value={millions(payroll.payroll)} />
+        <PayStat label="Tax payroll" value={millions(payroll.cbtPayroll)} />
+        <PayStat label="Luxury tax" value={payroll.tax > 0 ? millions(payroll.tax) : '$0'} color={tierColor} />
+      </View>
+      <View style={styles.payTrack}>
+        <View style={[styles.payFill, { width: pct(payroll.cbtPayroll), backgroundColor: tierColor }]} />
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={[styles.payTick, { left: pct(cbt.threshold + i * TIER_STEP) }]} />
+        ))}
+      </View>
+      <Text style={styles.note}>
+        {payroll.tier === 0
+          ? `${millions(cbt.threshold - payroll.cbtPayroll)} under the ${millions(cbt.threshold)} tax threshold`
+          : `Tax tier ${payroll.tier} of 4 · tiers at ${[0, 1, 2, 3].map((i) => millions(cbt.threshold + i * TIER_STEP)).join(', ')}`}
+      </Text>
+      <View style={styles.payControls}>
+        <Text style={styles.payControlLabel}>Threshold</Text>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => setCbt({ ...cbt, threshold: cbt.threshold - 5_000_000 })}
+          accessibilityRole="button"
+          accessibilityLabel="Lower tax threshold by 5 million"
+        >
+          <Text style={styles.stepBtnText}>-</Text>
+        </TouchableOpacity>
+        <Text style={styles.payControlValue}>{millions(cbt.threshold)}</Text>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => setCbt({ ...cbt, threshold: cbt.threshold + 5_000_000 })}
+          accessibilityRole="button"
+          accessibilityLabel="Raise tax threshold by 5 million"
+        >
+          <Text style={styles.stepBtnText}>+</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.payerBtn}
+          onPress={() => setCbt({ ...cbt, payerStatus: PAYER_ORDER[(PAYER_ORDER.indexOf(cbt.payerStatus) + 1) % 3] })}
+          accessibilityRole="button"
+          accessibilityLabel={`Tax payer status: ${PAYER_LABELS[cbt.payerStatus]}. Tap to change.`}
+        >
+          <Text style={styles.payerBtnText}>{PAYER_LABELS[cbt.payerStatus]} ▾</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.footnoteInline}>
+        2027 thresholds depend on the next CBA (the current one expires Dec 1, 2026); the default is the 2026 level. Free agents
+        are priced at FanGraphs' median contract estimate. Payroll via FanGraphs RosterResource.
+      </Text>
+    </View>
+  );
+};
+
+const PayStat: React.FC<{ label: string; value: string; color?: string }> = ({ label, value, color }) => (
+  <View style={styles.payStat}>
+    <Text style={[styles.payStatValue, color ? { color } : null]}>{value}</Text>
+    <Text style={styles.oddsLabel}>{label}</Text>
+  </View>
+);
+
 const CandidateRow: React.FC<{ c: Candidate; onAdd: () => void }> = ({ c, onAdd }) => {
   const verb = c.source === 'freeAgent' ? 'Sign' : c.source === 'trade' ? 'Acquire' : 'Call up';
   return (
@@ -288,7 +380,7 @@ const CandidateRow: React.FC<{ c: Candidate; onAdd: () => void }> = ({ c, onAdd 
           {c.name}
         </Text>
         <Text style={styles.rowSub} numberOfLines={1}>
-          {[c.position, c.age != null ? `Age ${c.age}` : null, c.from, money(c.medianAav)].filter(Boolean).join(' · ')}
+          {[c.position, c.age != null ? `Age ${c.age}` : null, c.from, money(c.cost)].filter(Boolean).join(' · ')}
         </Text>
         <Text style={styles.rowSub}>
           {c.war != null ? `${c.war.toFixed(1)} WAR` : ''}
@@ -455,6 +547,31 @@ const styles = StyleSheet.create({
   oddsValue: { fontSize: FONT_SIZE.base, fontWeight: '800', color: COLORS.textPrimary },
   oddsLabel: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600', marginTop: 2 },
   simulating: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: SPACING.xs },
+  simBtn: {
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm + 2,
+    alignItems: 'center',
+  },
+  simBtnText: { color: COLORS.white, fontSize: FONT_SIZE.base, fontWeight: '800' },
+
+  payHeader: { flexDirection: 'row', alignItems: 'center' },
+  payDelta: { fontSize: FONT_SIZE.md, fontWeight: '800' },
+  payRow: { flexDirection: 'row', gap: SPACING.sm },
+  payStat: { flex: 1, backgroundColor: COLORS.background, borderRadius: RADIUS.md, padding: SPACING.sm, alignItems: 'center' },
+  payStatValue: { fontSize: FONT_SIZE.base, fontWeight: '800', color: COLORS.textPrimary },
+  payTrack: { height: 10, borderRadius: RADIUS.full, backgroundColor: COLORS.lightGray, overflow: 'hidden', marginVertical: SPACING.xs },
+  payFill: { height: '100%', borderRadius: RADIUS.full },
+  payTick: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: COLORS.white },
+  payControls: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexWrap: 'wrap', marginTop: SPACING.xs },
+  payControlLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, fontWeight: '600' },
+  payControlValue: { fontSize: FONT_SIZE.sm, fontWeight: '800', color: COLORS.textPrimary, minWidth: 44, textAlign: 'center' },
+  stepBtn: { width: 28, height: 28, borderRadius: RADIUS.full, backgroundColor: COLORS.lightGray, alignItems: 'center', justifyContent: 'center' },
+  stepBtnText: { fontSize: FONT_SIZE.base, fontWeight: '800', color: COLORS.textPrimary },
+  payerBtn: { marginLeft: 'auto', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.lightGray },
+  payerBtnText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
+  footnoteInline: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, lineHeight: 15, marginTop: SPACING.xs },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
   chip: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, borderWidth: 1 },

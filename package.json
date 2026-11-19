@@ -13,7 +13,8 @@
     "test:coverage": "jest --coverage",
     "refresh:fa": "node scripts/refresh-free-agents.mjs",
     "build:projection-data": "node scripts/build-projection-data.ts",
-    "backtest": "node scripts/backtest.ts"
+    "backtest": "node scripts/backtest.ts",
+    "refresh:payroll": "node scripts/refresh-payroll.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

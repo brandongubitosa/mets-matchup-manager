@@ -68,3 +68,5 @@ export type { FixedWarPlayer, TeamProjection };
 export { buildLeagueContext } from './players.ts';
 export { simulateSeason, teamGameOutlook, summarizeOutlook, SIM_DEFAULTS } from './simulate.ts';
 export type { SeasonSimResult, TeamSimResult, GameOutlook, SimOptions } from './simulate.ts';
+export { simulateOneSeason, describeFinish } from './seasonSim.ts';
+export type { SeasonSimulation, SimGame, SeriesResult, StandingRow, PlayoffSeed } from './seasonSim.ts';

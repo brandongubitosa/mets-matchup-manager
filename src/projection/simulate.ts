@@ -124,12 +124,12 @@ export const mulberry32 = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-const normal = (rand: () => number) => {
+export const normal = (rand: () => number) => {
   const u = Math.max(rand(), 1e-12);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
 };
 
-const pickStarter = (starters: StarterOption[], r: number): StarterOption => {
+export const pickStarter = (starters: StarterOption[], r: number): StarterOption => {
   let acc = 0;
   for (const s of starters) {
     acc += s.share;

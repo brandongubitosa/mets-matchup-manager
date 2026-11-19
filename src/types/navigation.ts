@@ -52,6 +52,7 @@ export type RootStackParamList = {
   PlayerBackCard: PlayerBackCardParams;
   PredictionHistory: { teamId: number };
   SeasonBuilder: { teamId: number } | undefined;
+  SeasonSim: { teamId: number } | undefined;
 };
 
 export type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -71,3 +72,5 @@ export type PredictionHistoryScreenNavigationProp = NativeStackNavigationProp<Ro
 export type PredictionHistoryScreenRouteProp = RouteProp<RootStackParamList, 'PredictionHistory'>;
 export type SeasonBuilderScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SeasonBuilder'>;
 export type SeasonBuilderScreenRouteProp = RouteProp<RootStackParamList, 'SeasonBuilder'>;
+export type SeasonSimScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SeasonSim'>;
+export type SeasonSimScreenRouteProp = RouteProp<RootStackParamList, 'SeasonSim'>;

@@ -6,6 +6,7 @@ import { leagueContextFor, marginalWins, type FixedWarPlayer, type RosterMoves }
 import { cachedHitter, cachedPitcher } from '../projection/team';
 import { playerRoles } from '../projection/players';
 import { getFreeAgents, type FreeAgent } from './projectionData';
+import { MIN_SALARY, playerCost } from './payroll';
 
 export const seasonData = projectionJson as unknown as ProjectionData;
 
@@ -26,6 +27,8 @@ export interface Candidate {
   medianAav?: number | null;
   /** Wins added to the team if acquired now. */
   winsAdded: number;
+  /** 2027 cost against the luxury tax: contract CBT hit, free agent median AAV, or the minimum. */
+  cost: number;
   /** Signings with no MLB record are added by FanGraphs projected WAR. */
   fixedWar?: { id: string; name: string; war: number; isPitcher: boolean };
 }
@@ -89,6 +92,7 @@ const toFreeAgentCandidate = (fa: FreeAgent): Candidate => {
     fangraphsWar: fa.warProj,
     medianAav: fa.medianAav,
     winsAdded: 0,
+    cost: fa.medianAav ?? MIN_SALARY,
     fixedWar: p
       ? undefined
       : { id: fa.fangraphsId, name: fa.name, war: fa.warProj ?? 0, isPitcher: fa.isPitcher },
@@ -119,6 +123,7 @@ export const tradeCandidates = (
         from: teamAbbr(Number(otherId)),
         war,
         winsAdded: 0,
+        cost: playerCost(id).cbt,
       });
     }
   }
@@ -144,6 +149,7 @@ export const callUpCandidates = (teamId: number, moves: RosterMoves): Candidate[
         from: lastLevel,
         war,
         winsAdded: 0,
+        cost: MIN_SALARY,
       };
     });
   list.sort((a, b) => (b.war ?? -9) - (a.war ?? -9));
