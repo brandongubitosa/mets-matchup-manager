@@ -35,3 +35,7 @@ export const projectSeason = (data: ProjectionData, moves: Record<number, Roster
   projectLeague(buildTeamInputs(data, moves), buildLeagueContext(data.league, data.season));
 
 export type { FixedWarPlayer, TeamProjection };
+
+export { buildLeagueContext } from './players.ts';
+export { simulateSeason, teamGameOutlook, summarizeOutlook, SIM_DEFAULTS } from './simulate.ts';
+export type { SeasonSimResult, TeamSimResult, GameOutlook, SimOptions } from './simulate.ts';
