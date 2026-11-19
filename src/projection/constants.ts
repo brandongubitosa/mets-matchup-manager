@@ -1,22 +1,28 @@
-// Tunable constants for the projection engine. Phase 5 (backtesting) calibrates these.
+// Constants for the projection engine. TUNING values are calibrated with scripts/backtest.ts.
 
 /** Marcel season weights, most recent first. */
 export const SEASON_WEIGHTS = [5, 4, 3];
 
-/** MiLB seasons count less than MLB seasons of the same year. */
-export const MILB_SEASON_WEIGHT = 0.6;
-
-/** Regression to league average: PA / BF of league-average performance added to every player. */
-export const HITTER_REGRESSION_PA = 1200;
-export const PITCHER_REGRESSION_BF = 600;
-
-/** Age curve: peak age, yearly improvement before it, yearly decline after it. */
-export const PEAK_AGE = 29;
-export const YOUNG_GAIN = 0.006;
-export const OLD_DECLINE = 0.003;
-
-/** Share of MLB production a MiLB stat line translates to, by level. */
-export const MILB_FACTOR = { AAA: 0.88, AA: 0.82, 'A+': 0.75, A: 0.68 } as const;
+/**
+ * Parameters calibrated by scripts/backtest.ts against 2024-2026 actual records (90 team-seasons:
+ * RMSE 9.3 wins vs 11.6 for picking 81). Mutable so the backtest can search them; the app never does.
+ */
+export const TUNING = {
+  /** PA / BF of league-average performance added to every player (regression to the mean). */
+  hitterRegressionPa: 2000,
+  pitcherRegressionBf: 300,
+  /** MiLB seasons count less than MLB seasons of the same year. */
+  milbSeasonWeight: 0.6,
+  /** Share of MLB production a MiLB stat line translates to, by level. */
+  milbFactor: { AAA: 0.88, AA: 0.82, 'A+': 0.7, A: 0.62 } as Record<'AAA' | 'AA' | 'A+' | 'A', number>,
+  /** Age curve: peak age, yearly improvement before it, yearly decline after it. */
+  peakAge: 29,
+  youngGain: 0.006,
+  oldDecline: 0.003,
+  /** Replacement-level pitchers allow league RA9 × factor. */
+  spReplacementRa9: 1.2,
+  rpReplacementRa9: 1.2,
+};
 
 /** Run values of batting events above an out. */
 export const RUN_VALUES = { ubb: 0.57, hbp: 0.6, single: 0.74, double: 1.05, triple: 1.34, hr: 1.74 };
@@ -37,10 +43,8 @@ export const POSITION_ADJ: Record<string, number> = {
 };
 export const FULL_SEASON_PA = 680;
 
-/** Replacement level: hitters lose this many runs per 600 PA vs. average; pitchers allow RA9 × factor. */
+/** Replacement level: hitters lose this many runs per 600 PA vs. average. */
 export const HITTER_REPLACEMENT_RUNS_PER_600 = 20;
-export const SP_REPLACEMENT_RA9_FACTOR = 1.25;
-export const RP_REPLACEMENT_RA9_FACTOR = 1.1;
 
 /** Team playing time slots. */
 export const TEAM_PA = 6200;

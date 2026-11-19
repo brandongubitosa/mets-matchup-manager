@@ -6,21 +6,13 @@ import {
   CS_RUNS,
   FIELD_POSITIONS,
   FULL_SEASON_PA,
-  HITTER_REGRESSION_PA,
   HITTER_REPLACEMENT_RUNS_PER_600,
   IMPLIED_POSITIONS,
-  MILB_FACTOR,
-  MILB_SEASON_WEIGHT,
-  OLD_DECLINE,
-  PEAK_AGE,
-  PITCHER_REGRESSION_BF,
   POSITION_ADJ,
-  RP_REPLACEMENT_RA9_FACTOR,
   RUN_VALUES,
   SB_RUNS,
   SEASON_WEIGHTS,
-  SP_REPLACEMENT_RA9_FACTOR,
-  YOUNG_GAIN,
+  TUNING,
 } from './constants.ts';
 
 // ---------- League context ----------
@@ -142,7 +134,7 @@ export const ageInSeason = (birthDate: string | null, season: number): number | 
 /** Multiplier on a player's production for aging from last season to this one. */
 export const ageFactor = (age: number | null): number => {
   if (age == null) return 1;
-  return age < PEAK_AGE ? 1 + YOUNG_GAIN * (PEAK_AGE - age) : 1 - OLD_DECLINE * (age - PEAK_AGE);
+  return age < TUNING.peakAge ? 1 + TUNING.youngGain * (TUNING.peakAge - age) : 1 - TUNING.oldDecline * (age - TUNING.peakAge);
 };
 
 const seasonWeight = (season: number, projSeason: number): number => SEASON_WEIGHTS[projSeason - 1 - season] ?? 0;
@@ -171,7 +163,7 @@ export interface HitterProjection {
 
 /** Translates a MiLB line to MLB-equivalent events: less contact quality, more strikeouts. */
 const translateMilbHitting = (events: ReturnType<typeof hitEvents>, level: MilbLevel) => {
-  const f = MILB_FACTOR[level];
+  const f = TUNING.milbFactor[level];
   return {
     single: events.single * f,
     double: events.double * f,
@@ -216,7 +208,7 @@ export const projectHitter = (p: ProjectionPlayer, lg: LeagueContext): HitterPro
     add(
       translateMilbHitting(hitEvents(line), line.level),
       line.pa,
-      seasonWeight(line.season, lg.season) * MILB_SEASON_WEIGHT,
+      seasonWeight(line.season, lg.season) * TUNING.milbSeasonWeight,
     );
   }
 
@@ -224,7 +216,7 @@ export const projectHitter = (p: ProjectionPlayer, lg: LeagueContext): HitterPro
   const af = ageFactor(age);
   const rates = {} as HitRates;
   for (const k of Object.keys(lg.bat) as (keyof HitRates)[]) {
-    const regressed = ((sums[k] ?? 0) + HITTER_REGRESSION_PA * lg.bat[k]) / (weightedPa + HITTER_REGRESSION_PA);
+    const regressed = ((sums[k] ?? 0) + TUNING.hitterRegressionPa * lg.bat[k]) / (weightedPa + TUNING.hitterRegressionPa);
     // Aging scales good outcomes; strikeouts move the opposite way.
     rates[k] = k === 'so' ? regressed / af : k === 'cs' ? regressed : regressed * af;
   }
@@ -279,12 +271,12 @@ export interface PitcherProjection {
 }
 
 const translateMilbPitching = (events: ReturnType<typeof pitchEvents>, level: MilbLevel) => {
-  const f = MILB_FACTOR[level];
-  return { so: events.so * f, bb: events.bb * (2 - f), hr: events.hr * (2 - f) * (2 - f), outs: events.outs * f };
+  const f = TUNING.milbFactor[level];
+  return { so: events.so * f, bb: events.bb * (2 - f), hr: events.hr * (2 - f), outs: events.outs * f };
 };
 
 export const replacementRa9 = (role: 'SP' | 'RP', lg: LeagueContext) =>
-  lg.ra9 * (role === 'SP' ? SP_REPLACEMENT_RA9_FACTOR : RP_REPLACEMENT_RA9_FACTOR);
+  lg.ra9 * (role === 'SP' ? TUNING.spReplacementRa9 : TUNING.rpReplacementRa9);
 
 export const projectPitcher = (p: ProjectionPlayer, lg: LeagueContext): PitcherProjection => {
   const sums: Record<string, number> = {};
@@ -303,7 +295,7 @@ export const projectPitcher = (p: ProjectionPlayer, lg: LeagueContext): PitcherP
     apps += w * line.g;
   }
   for (const line of p.milbPitching) {
-    const w = seasonWeight(line.season, lg.season) * MILB_SEASON_WEIGHT;
+    const w = seasonWeight(line.season, lg.season) * TUNING.milbSeasonWeight;
     add(translateMilbPitching(pitchEvents(line), line.level), line.bf, w);
     starts += w * line.gs;
     apps += w * line.g;
@@ -313,7 +305,7 @@ export const projectPitcher = (p: ProjectionPlayer, lg: LeagueContext): PitcherP
   const af = ageFactor(age);
   const rates = {} as PitchRates;
   for (const k of Object.keys(lg.pit) as (keyof PitchRates)[]) {
-    const regressed = ((sums[k] ?? 0) + PITCHER_REGRESSION_BF * lg.pit[k]) / (weightedBf + PITCHER_REGRESSION_BF);
+    const regressed = ((sums[k] ?? 0) + TUNING.pitcherRegressionBf * lg.pit[k]) / (weightedBf + TUNING.pitcherRegressionBf);
     rates[k] = k === 'so' || k === 'outs' ? regressed * af : regressed / af;
   }
   const ra9 = rawFip(rates) + lg.fipConstant;
