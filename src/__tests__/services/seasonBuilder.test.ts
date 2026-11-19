@@ -102,4 +102,10 @@ describe('sanitizeMoves', () => {
       }),
     ).toEqual({ add: [1, 3], addFixedWar: [{ id: 'a', name: 'A', war: 1.5, isPitcher: false }] });
   });
+
+  it('gives id-less fixed-WAR signings an identity Undo can remove', () => {
+    const moves = sanitizeMoves({ addFixedWar: [{ name: 'NPB Star', war: 2, isPitcher: true }] });
+    const [chip] = describeMoves(moves);
+    expect(removeFixedWar(moves, chip.id).addFixedWar).toEqual([]);
+  });
 });

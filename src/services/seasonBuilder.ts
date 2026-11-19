@@ -189,7 +189,7 @@ export const restorePlayer = (moves: RosterMoves, playerId: number): RosterMoves
 
 export const removeFixedWar = (moves: RosterMoves, id: string): RosterMoves => ({
   ...moves,
-  addFixedWar: (moves.addFixedWar ?? []).filter((f) => f.id !== id),
+  addFixedWar: (moves.addFixedWar ?? []).filter((f) => (f.id ?? f.name) !== id),
 });
 
 /** Validates moves read from storage; anything malformed is dropped rather than crashing the screen. */
@@ -211,7 +211,8 @@ export const sanitizeMoves = (raw: unknown): RosterMoves => {
   const out: RosterMoves = {};
   if (ids(r.add).length) out.add = ids(r.add);
   if (ids(r.remove).length) out.remove = ids(r.remove);
-  if (fixed.length) out.addFixedWar = fixed;
+  // Every signing needs a stable id so Undo can find it; older or hand-edited entries fall back to the name.
+  if (fixed.length) out.addFixedWar = fixed.map((f) => ({ ...f, id: typeof f.id === 'string' && f.id ? f.id : f.name }));
   return out;
 };
 
