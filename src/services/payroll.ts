@@ -98,6 +98,16 @@ export interface TeamPayroll {
   tier: number;
 }
 
+/**
+ * What adding a player changes a team's 2027 payroll by. A player whose contract is already in the
+ * team's baseline payroll (e.g. a call-up from its own minors with a big-league contract) adds nothing.
+ */
+export const addedCost = (teamId: number, playerId: number): { salary: number; cbt: number } => {
+  if (data.teams[teamId]?.players[playerId]) return { salary: 0, cbt: 0 };
+  const c = playerCost(playerId);
+  return { salary: c.salary, cbt: c.cbt };
+};
+
 /** A team's 2027 payroll after roster moves, with luxury tax under the given settings. */
 export const teamPayroll = (teamId: number, moves: RosterMoves = {}, s: CbtSettings = DEFAULT_CBT): TeamPayroll => {
   const team = data.teams[teamId];
@@ -105,7 +115,7 @@ export const teamPayroll = (teamId: number, moves: RosterMoves = {}, s: CbtSetti
   let cbtPayroll = team?.cbtPayroll ?? payroll;
   let delta = 0;
   for (const id of moves.add ?? []) {
-    const c = playerCost(id);
+    const c = addedCost(teamId, id);
     payroll += c.salary;
     cbtPayroll += c.cbt;
     delta += c.cbt;

@@ -6,7 +6,7 @@ import { leagueContextFor, marginalWins, type FixedWarPlayer, type RosterMoves }
 import { cachedHitter, cachedPitcher } from '../projection/team';
 import { playerRoles } from '../projection/players';
 import { getFreeAgents, type FreeAgent } from './projectionData';
-import { MIN_SALARY, playerCost } from './payroll';
+import { MIN_SALARY, addedCost, playerCost } from './payroll';
 
 export const seasonData = projectionJson as unknown as ProjectionData;
 
@@ -156,7 +156,7 @@ export const callUpCandidates = (
         from: lastLevel,
         war,
         winsAdded: 0,
-        cost: playerCost(p.id).cbt,
+        cost: addedCost(teamId, p.id).cbt,
       };
     });
   list.sort((a, b) => (b.war ?? -9) - (a.war ?? -9));

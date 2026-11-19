@@ -54,6 +54,15 @@ describe('team payroll', () => {
     }
   });
 
+  it('does not double-count a player already on the team payroll', () => {
+    const payroll = require('../../data/payroll.json');
+    const [teamId, entry] = Object.entries(payroll.teams as Record<string, { players: Record<string, unknown> }>).find(
+      ([, t]) => Object.keys(t.players).length > 0,
+    )!;
+    const id = Number(Object.keys(entry.players)[0]);
+    expect(teamPayroll(Number(teamId), { add: [id] }).delta).toBe(0);
+  });
+
   it('prices players without a contract at the minimum', () => {
     const callUp = seasonData.callUps[METS][0];
     expect(playerCost(callUp)).toEqual({ salary: MIN_SALARY, cbt: MIN_SALARY, source: 'minimum' });
