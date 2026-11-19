@@ -11,6 +11,8 @@ import {
   GamePredictionScreen,
   PlayerBackCardScreen,
   PredictionHistoryScreen,
+  SeasonBuilderScreen,
+  SeasonSimScreen,
 } from './src/screens';
 import { ErrorBoundary, WebContainer } from './src/components';
 import { WebDocumentHead } from './src/components/WebDocumentHead';
@@ -80,6 +82,16 @@ export default function App() {
               name="PredictionHistory"
               component={PredictionHistoryScreen}
               options={{ title: 'Prediction Record', headerShown: false }}
+            />
+            <Stack.Screen
+              name="SeasonBuilder"
+              component={SeasonBuilderScreen}
+              options={{ title: 'Season Builder', headerShown: false }}
+            />
+            <Stack.Screen
+              name="SeasonSim"
+              component={SeasonSimScreen}
+              options={{ title: 'Season Sim', headerShown: false }}
             />
           </Stack.Navigator>
         </NavigationContainer>
