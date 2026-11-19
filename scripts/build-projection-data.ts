@@ -9,7 +9,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchSnapshot } from './lib/snapshot.ts';
 
-const season = Number(process.argv[2]) || new Date().getFullYear() + 1;
+// Default: next season during the offseason (October onward), otherwise the current season.
+const season = Number(process.argv[2]) || new Date().getFullYear() + (new Date().getMonth() >= 9 ? 1 : 0);
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 let freeAgents = [];

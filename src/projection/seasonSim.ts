@@ -133,8 +133,12 @@ const playGame = (
 };
 
 /** Top four starters in rotation order (by RA9), the usual postseason rotation. */
-const playoffRotation = (r: TeamRating) =>
-  r.starters.filter((s) => s.name !== 'Replacement SP').slice(0, 4).concat(r.starters).slice(0, Math.max(1, Math.min(4, r.starters.length)));
+const playoffRotation = (r: TeamRating) => {
+  const named = r.starters.filter((s) => s.name !== 'Replacement SP');
+  const fillIns = r.starters.filter((s) => s.name === 'Replacement SP');
+  const rotation = [...named, ...fillIns].slice(0, 4);
+  return rotation.length ? rotation : r.starters.slice(0, 1);
+};
 
 /** Home games for the higher seed by game number: 2-2-1 (best of 5), 2-3-2 (best of 7), all (best of 3). */
 const higherSeedHome = (bestOf: number, game: number) =>

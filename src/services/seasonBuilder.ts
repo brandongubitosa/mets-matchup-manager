@@ -156,7 +156,7 @@ export const callUpCandidates = (
         from: lastLevel,
         war,
         winsAdded: 0,
-        cost: MIN_SALARY,
+        cost: playerCost(p.id).cbt,
       };
     });
   list.sort((a, b) => (b.war ?? -9) - (a.war ?? -9));

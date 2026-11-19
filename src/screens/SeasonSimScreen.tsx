@@ -38,7 +38,7 @@ const ordinal = (n: number) => `${n}${['th', 'st', 'nd', 'rd'][n % 100 > 10 && n
 
 export const SeasonSimScreen: React.FC<Props> = ({ navigation, route }) => {
   const teamId = route.params?.teamId ?? 121;
-  const b = useSeasonBuilder(teamId, { odds: false });
+  const b = useSeasonBuilder(teamId, { odds: false, moves: route.params?.moves });
   const [sim, setSim] = useState<SeasonSimulation | null>(null);
   const [count, setCount] = useState(0);
   const [tab, setTab] = useState<Tab>('log');

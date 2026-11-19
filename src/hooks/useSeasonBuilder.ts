@@ -10,18 +10,22 @@ import {
   type SeasonSimResult,
 } from '../projection';
 import { sanitizeMoves, seasonData } from '../services/seasonBuilder';
-import { DEFAULT_CBT, teamPayroll, type CbtSettings } from '../services/payroll';
+import { DEFAULT_CBT, MIN_THRESHOLD, teamPayroll, type CbtSettings } from '../services/payroll';
 
 const SIMS = 1000;
 const EMPTY_MOVES: RosterMoves = {};
 const storageKey = (teamId: number) => `seasonBuilder:${seasonData.season}:${teamId}`;
 
 /** Roster moves for one team, persisted per device, with live projections and a background simulation. */
-export const useSeasonBuilder = (teamId: number, opts: { odds?: boolean } = {}) => {
+export const useSeasonBuilder = (teamId: number, opts: { odds?: boolean; moves?: RosterMoves } = {}) => {
   const runOdds = opts.odds !== false;
+  // Moves passed in (e.g. from the builder to the sim screen) are used as-is instead of storage.
+  const fixedMoves = opts.moves;
   // Moves are tagged with the team they were loaded for, so switching teams never shows or saves
   // the previous team's moves while the new team's are loading.
-  const [store, setStore] = useState<{ teamId: number | null; moves: RosterMoves }>({ teamId: null, moves: {} });
+  const [store, setStore] = useState<{ teamId: number | null; moves: RosterMoves }>(() =>
+    fixedMoves ? { teamId, moves: sanitizeMoves(fixedMoves) } : { teamId: null, moves: {} },
+  );
   const loaded = store.teamId === teamId;
   const moves = loaded ? store.moves : EMPTY_MOVES;
   const [sim, setSim] = useState<SeasonSimResult | null>(null);
@@ -29,6 +33,10 @@ export const useSeasonBuilder = (teamId: number, opts: { odds?: boolean } = {}) 
   const simRun = useRef(0);
 
   useEffect(() => {
+    if (fixedMoves) {
+      setStore({ teamId, moves: sanitizeMoves(fixedMoves) });
+      return;
+    }
     let cancelled = false;
     AsyncStorage.getItem(storageKey(teamId))
       .then((raw) => (raw ? sanitizeMoves(JSON.parse(raw)) : {}))
@@ -39,18 +47,18 @@ export const useSeasonBuilder = (teamId: number, opts: { odds?: boolean } = {}) 
     return () => {
       cancelled = true;
     };
-  }, [teamId]);
+  }, [teamId, fixedMoves]);
 
   const setMoves = useCallback(
     (next: RosterMoves | ((m: RosterMoves) => RosterMoves)) => {
       setStore((prev) => {
         if (prev.teamId !== teamId) return prev; // still loading this team's moves
         const value = typeof next === 'function' ? next(prev.moves) : next;
-        AsyncStorage.setItem(storageKey(teamId), JSON.stringify(value)).catch(() => undefined);
+        if (!fixedMoves) AsyncStorage.setItem(storageKey(teamId), JSON.stringify(value)).catch(() => undefined);
         return { teamId, moves: value };
       });
     },
-    [teamId],
+    [teamId, fixedMoves],
   );
 
   const lg = leagueContextFor(seasonData);
@@ -105,15 +113,17 @@ const CBT_KEY = 'seasonBuilder:cbtSettings';
 /** Luxury tax settings (threshold and payer status), saved on the device. */
 export const useCbtSettings = () => {
   const [settings, setState] = useState<CbtSettings>(DEFAULT_CBT);
+  // If the user edits before the saved settings finish loading, the edit wins.
+  const edited = useRef(false);
   useEffect(() => {
     AsyncStorage.getItem(CBT_KEY)
       .then((raw) => {
-        if (!raw) return;
+        if (!raw || edited.current) return;
         const v = JSON.parse(raw);
         if (
           v &&
           Number.isFinite(v.threshold) &&
-          v.threshold > 0 &&
+          v.threshold >= MIN_THRESHOLD &&
           ['first', 'second', 'repeat'].includes(v.payerStatus)
         ) {
           setState({ threshold: v.threshold, payerStatus: v.payerStatus });
@@ -122,8 +132,10 @@ export const useCbtSettings = () => {
       .catch(() => undefined);
   }, []);
   const setSettings = useCallback((next: CbtSettings) => {
-    setState(next);
-    AsyncStorage.setItem(CBT_KEY, JSON.stringify(next)).catch(() => undefined);
+    edited.current = true;
+    const value = { ...next, threshold: Math.max(MIN_THRESHOLD, next.threshold) };
+    setState(value);
+    AsyncStorage.setItem(CBT_KEY, JSON.stringify(value)).catch(() => undefined);
   }, []);
   return { settings, setSettings };
 };

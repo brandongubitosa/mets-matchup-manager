@@ -1,5 +1,5 @@
 import { DEFAULT_CBT, MIN_SALARY, cbtTier, luxuryTax, playerCost, teamPayroll } from '../../services/payroll';
-import { freeAgentCandidates, seasonData } from '../../services/seasonBuilder';
+import { callUpCandidates, freeAgentCandidates, seasonData } from '../../services/seasonBuilder';
 
 const M = 1_000_000;
 const METS = 121;
@@ -16,9 +16,11 @@ describe('luxury tax', () => {
     expect(luxuryTax(254 * M, { ...DEFAULT_CBT, payerStatus: 'repeat' })).toBeCloseTo(5 * M);
   });
 
-  it('adds surcharges at each $20M tier', () => {
-    // $314M, first-time payer: 70M x 20% + 50M x 12% + 30M x 42.5% + 10M x 60%
-    expect(luxuryTax(314 * M)).toBeCloseTo(14 * M + 6 * M + 12.75 * M + 6 * M);
+  it('adds a surcharge only on the slice in each $20M band', () => {
+    // $314M, first-time payer: 70M x 20% base + 20M x 12% + 20M x 42.5% + 10M x 60%
+    expect(luxuryTax(314 * M)).toBeCloseTo(14 * M + 2.4 * M + 8.5 * M + 6 * M);
+    // Repeat payer, $274M: 30M x 50% + 10M x 12%
+    expect(luxuryTax(274 * M, { ...DEFAULT_CBT, payerStatus: 'repeat' })).toBeCloseTo(15 * M + 1.2 * M);
     expect(cbtTier(314 * M)).toBe(4);
     expect(cbtTier(270 * M)).toBe(2);
   });
@@ -44,6 +46,12 @@ describe('team payroll', () => {
     const contracted = seasonData.rosters[METS].find((id) => playerCost(id).source === 'contract')!;
     const after = teamPayroll(METS, { remove: [contracted] });
     expect(after.delta).toBe(-playerCost(contracted).cbt);
+  });
+
+  it('quotes call-ups at the same cost payroll charges', () => {
+    for (const c of callUpCandidates(METS, {})) {
+      expect(teamPayroll(METS, { add: [c.mlbId!] }).delta).toBe(c.cost);
+    }
   });
 
   it('prices players without a contract at the minimum', () => {

@@ -40,19 +40,24 @@ export const TIER_STEP = 20_000_000;
 const BASE_RATE: Record<PayerStatus, number> = { first: 0.2, second: 0.3, repeat: 0.5 };
 
 /**
- * Luxury tax owed for a CBT payroll: base rate (20/30/50% by consecutive years over) on everything
- * above the threshold, plus surcharges of 12% above +$20M, 42.5% (45% for repeat payers) above
- * +$40M, and 60% above +$60M.
+ * Luxury tax owed for a CBT payroll: the base rate (20/30/50% by consecutive years over) on
+ * everything above the threshold, plus a surcharge on the slice in each $20M band above it:
+ * 12% from +$20M to +$40M, 42.5% (45% for repeat payers) from +$40M to +$60M, 60% beyond +$60M.
+ * Surcharges apply only to their own band; they do not stack.
  */
 export const luxuryTax = (cbtPayroll: number, s: CbtSettings = DEFAULT_CBT): number => {
   const over = (step: number) => Math.max(0, cbtPayroll - (s.threshold + step * TIER_STEP));
+  const band = (step: number) => over(step) - over(step + 1);
   return (
     over(0) * BASE_RATE[s.payerStatus] +
-    over(1) * 0.12 +
-    over(2) * (s.payerStatus === 'first' ? 0.425 : 0.45) +
+    band(1) * 0.12 +
+    band(2) * (s.payerStatus === 'first' ? 0.425 : 0.45) +
     over(3) * 0.6
   );
 };
+
+/** Lowest threshold the settings allow, so a saved value is always usable. */
+export const MIN_THRESHOLD = 100_000_000;
 
 /** 0 = under the threshold, 1-4 = which CBT tier the payroll is in. */
 export const cbtTier = (cbtPayroll: number, s: CbtSettings = DEFAULT_CBT): number => {

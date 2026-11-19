@@ -18,7 +18,7 @@ import {
   type Candidate,
 } from '../services/seasonBuilder';
 import type { TeamProjection } from '../projection';
-import { TIER_STEP, type CbtSettings, type PayerStatus, type TeamPayroll } from '../services/payroll';
+import { MIN_THRESHOLD, TIER_STEP, type CbtSettings, type PayerStatus, type TeamPayroll } from '../services/payroll';
 
 type Props = {
   navigation: SeasonBuilderScreenNavigationProp;
@@ -125,7 +125,7 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           {b.simulating && <Text style={styles.simulating}>Simulating {seasonData.season} season…</Text>}
           <TouchableOpacity
-            onPress={() => navigation.navigate('SeasonSim', { teamId })}
+            onPress={() => navigation.navigate('SeasonSim', { teamId, moves: b.moves })}
             style={styles.simBtn}
             accessibilityRole="button"
             accessibilityLabel={`Sim the ${seasonData.season} season`}
@@ -334,7 +334,7 @@ const PayrollCard: React.FC<{
         <Text style={styles.payControlLabel}>Threshold</Text>
         <TouchableOpacity
           style={styles.stepBtn}
-          onPress={() => setCbt({ ...cbt, threshold: cbt.threshold - 5_000_000 })}
+          onPress={() => setCbt({ ...cbt, threshold: Math.max(MIN_THRESHOLD, cbt.threshold - 5_000_000) })}
           accessibilityRole="button"
           accessibilityLabel="Lower tax threshold by 5 million"
         >

@@ -52,7 +52,7 @@ export type RootStackParamList = {
   PlayerBackCard: PlayerBackCardParams;
   PredictionHistory: { teamId: number };
   SeasonBuilder: { teamId: number } | undefined;
-  SeasonSim: { teamId: number } | undefined;
+  SeasonSim: { teamId: number; moves?: import('../projection').RosterMoves } | undefined;
 };
 
 export type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
