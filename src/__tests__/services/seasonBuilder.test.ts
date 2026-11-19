@@ -42,6 +42,14 @@ describe('season builder candidates', () => {
     for (const t of seasonData.teams) expect(callUpCandidates(t.id, {}).length).toBeGreaterThan(0);
   });
 
+  it('finds call-ups ranked below the display limit by search', () => {
+    const all = seasonData.callUps[METS].map((id) => seasonData.players[id]);
+    const top = new Set(callUpCandidates(METS, {}).map((c) => c.mlbId));
+    const deep = all.find((p) => !top.has(p.id))!;
+    expect(deep).toBeDefined();
+    expect(callUpCandidates(METS, {}, { query: deep.name }).some((c) => c.mlbId === deep.id)).toBe(true);
+  });
+
   it('lists call-up candidates not on the 40-man', () => {
     const list = callUpCandidates(METS, {});
     expect(list.length).toBeGreaterThan(0);

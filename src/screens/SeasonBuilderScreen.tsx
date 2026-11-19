@@ -64,7 +64,7 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
         pitchers: faFilter === 'all' ? undefined : faFilter === 'pit',
       });
     if (tab === 'trade') return tradeCandidates(teamId, b.moves, { query });
-    if (tab === 'callup') return callUpCandidates(teamId, b.moves);
+    if (tab === 'callup') return callUpCandidates(teamId, b.moves, { query });
     return [];
   }, [tab, teamId, b.moves, query, faFilter]);
 
@@ -182,11 +182,13 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </ScrollView>
 
-        {(tab === 'sign' || tab === 'trade') && (
+        {(tab === 'sign' || tab === 'trade' || tab === 'callup') && (
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder={tab === 'sign' ? 'Search free agents' : 'Search any MLB player'}
+            placeholder={
+              tab === 'sign' ? 'Search free agents' : tab === 'trade' ? 'Search any MLB player' : 'Search your minor leaguers'
+            }
             placeholderTextColor={COLORS.textMuted}
             style={styles.search}
             autoCorrect={false}

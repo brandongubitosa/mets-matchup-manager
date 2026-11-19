@@ -132,10 +132,17 @@ export const tradeCandidates = (
 };
 
 /** Organization minor leaguers not on the 40-man. */
-export const callUpCandidates = (teamId: number, moves: RosterMoves): Candidate[] => {
+export const callUpCandidates = (
+  teamId: number,
+  moves: RosterMoves,
+  opts: { query?: string; limit?: number } = {},
+): Candidate[] => {
+  const q = opts.query?.trim().toLowerCase() ?? '';
+  // Search the whole organization before the display limit so lower-ranked prospects stay reachable.
   const list = (seasonData.callUps[teamId] ?? [])
     .map((id) => seasonData.players[id])
     .filter((p): p is ProjectionPlayer => !!p && !isOnTeam(teamId, moves, p.id))
+    .filter((p) => !q || p.name.toLowerCase().includes(q))
     .map((p) => {
       const { war, position } = playerWar(p);
       const lastLevel = [...p.milbHitting, ...p.milbPitching].sort((a, b) => b.season - a.season)[0]?.level ?? 'MiLB';
@@ -153,7 +160,7 @@ export const callUpCandidates = (teamId: number, moves: RosterMoves): Candidate[
       };
     });
   list.sort((a, b) => (b.war ?? -9) - (a.war ?? -9));
-  return withWinsAdded(teamId, moves, list.slice(0, 40));
+  return withWinsAdded(teamId, moves, list.slice(0, opts.limit ?? 40));
 };
 
 const withWinsAdded = (teamId: number, moves: RosterMoves, list: Candidate[]): Candidate[] => {
