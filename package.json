@@ -10,7 +10,8 @@
     "build": "expo export --platform web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "refresh:fa": "node scripts/refresh-free-agents.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
