@@ -38,6 +38,10 @@ describe('season builder candidates', () => {
     expect(targets.every((c) => !seasonData.rosters[METS].includes(c.mlbId!))).toBe(true);
   });
 
+  it('has call-up candidates for every team', () => {
+    for (const t of seasonData.teams) expect(callUpCandidates(t.id, {}).length).toBeGreaterThan(0);
+  });
+
   it('lists call-up candidates not on the 40-man', () => {
     const list = callUpCandidates(METS, {});
     expect(list.length).toBeGreaterThan(0);

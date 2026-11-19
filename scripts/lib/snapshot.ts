@@ -41,8 +41,8 @@ export interface SnapshotOptions {
   rosterDate?: string;
   /** Free agents to match to MLB ids (from src/data/freeAgents.json). */
   freeAgents?: { fangraphsId: string; name: string; age: number | null }[];
-  /** MLB orgs whose upper-minors players to include as call-up candidates. */
-  callUpOrgs?: number[];
+  /** MLB orgs whose upper-minors players to include as call-up candidates ('all' = every team). */
+  callUpOrgs?: number[] | 'all';
   log?: (msg: string) => void;
 }
 
@@ -94,19 +94,24 @@ export const fetchSnapshot = async (season: number, opts: SnapshotOptions = {}):
     log(`  ${team.abbr}: ${rosters[team.id].length} players`);
   });
 
+  const rostered = new Set(Object.values(rosters).flat());
+
   // Call-up candidates: upper-minors (AAA, AA, High-A) players not on the 40-man.
   const callUps: Record<string, number[]> = {};
-  for (const orgId of opts.callUpOrgs ?? []) {
+  const callUpOrgs = opts.callUpOrgs === 'all' ? teams.map((t) => t.id) : (opts.callUpOrgs ?? []);
+  await mapLimit(callUpOrgs, 3, async (orgId) => {
     const aff = await get(`/teams/affiliates?teamIds=${orgId}&season=${season - 1}`);
     const clubs = aff.teams.filter((t: any) => [11, 12, 13].includes(t.sport?.id)).map((t: any) => t.id);
     const ids = new Set<number>();
     for (const club of clubs) {
       const r = await get(`/teams/${club}/roster?rosterType=active&season=${season - 1}`);
-      for (const e of r.roster ?? []) if (!players[e.person.id]) ids.add(e.person.id);
+      for (const e of r.roster ?? []) if (!rostered.has(e.person.id)) ids.add(e.person.id);
     }
-    await addPeople([...ids]);
     callUps[orgId] = [...ids];
-    log(`  Call-up candidates for ${orgId}: ${ids.size}`);
+  });
+  await addPeople(Object.values(callUps).flat());
+  if (callUpOrgs.length) {
+    log(`  Call-up candidates: ${Object.values(callUps).flat().length} across ${callUpOrgs.length} orgs`);
   }
 
   const league = await mapLimit(mlbSeasons, 3, async (s) => {

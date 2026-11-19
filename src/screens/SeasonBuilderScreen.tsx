@@ -205,9 +205,7 @@ export const SeasonBuilderScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
             {candidates.length === 0 && (
               <Text style={styles.note}>
-                {tab === 'callup' && !seasonData.callUps[teamId]
-                  ? `Call-up candidates are currently available for the Mets only. Use the Trade tab to add any 40-man player.`
-                  : 'No players found.'}
+                No players found.
               </Text>
             )}
             {candidates.map((c) => (

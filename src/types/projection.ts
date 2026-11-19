@@ -107,6 +107,6 @@ export interface ProjectionData {
   schedule: ScheduledGame[];
   /** FanGraphs free agent id -> MLB player id (only for free agents matched by name). */
   freeAgentIds: Record<string, number>;
-  /** Org minor leaguers not on the 40-man (call-up candidates) by MLB team id. */
+  /** Org minor leaguers not on the 40-man (call-up candidates) by MLB team id, for every team. */
   callUps: Record<string, number[]>;
 }

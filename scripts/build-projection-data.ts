@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds src/data/projectionData.json: every team's 40-man roster with 3 seasons of MLB stats,
 // 2 seasons of MiLB stats, league totals, the regular season schedule, MLB ids for free agents and
-// Mets call-up candidates.
+// call-up candidates (AAA/AA/High-A players not on the 40-man) for every organization.
 // Usage: node scripts/build-projection-data.ts [season]   (run `npm run refresh:fa` first)
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -20,7 +20,7 @@ try {
 }
 
 console.log(`Building projection data for ${season}`);
-const data = await fetchSnapshot(season, { freeAgents, callUpOrgs: [121], log: console.log });
+const data = await fetchSnapshot(season, { freeAgents, callUpOrgs: 'all', log: console.log });
 
 const outPath = join(root, 'src/data/projectionData.json');
 mkdirSync(dirname(outPath), { recursive: true });
